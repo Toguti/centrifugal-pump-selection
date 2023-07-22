@@ -1,9 +1,10 @@
 import numpy as np
 import scipy.constants as sc
+from CoolProp.CoolProp import PropsSI
 
 ## Friction Factor - Uses the Colebrook equation for 
 
-def friction_factor(Re, roughness, D, tol=1e-6, max_iter=1000):
+def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
     """
     Re: Reynolds number
     roughness: Absolute roughness of the pipe
@@ -12,8 +13,9 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=1000):
     max_iter: Maximum number of iterations
     """
     # Initial guess (Churchill's formula)
-    f = (8*((8/Re)**12 + (2.457*np.log(1/((7/Re)**0.9 + 0.27*(roughness/D))))**1.5)**(1/12))**2
     epsilon = roughness / D  # Relative roughness
+    f = (8*((8/Re)**12 + (2.457*np.log(1/((7/Re)**0.9 + 0.27*(epsilon))))**1.5)**(1/12))**2
+   
 
     # Simple Fixed-Point Iteration
     for _ in range(max_iter):
@@ -25,11 +27,6 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=1000):
     # If the method didn't converge
     raise RuntimeError(f"Failed to converge after {max_iter} iterations.")
 
-# Example usage:
-f = friction_factor(Re=1e5, roughness=0.0000015, D=0.05)
-print(f"Friction factor: {f}")
-
-##
 
 def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
     """
@@ -69,7 +66,3 @@ def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
     delta_p = rho * g * (h_f + h_s + h_g)
 
     return delta_p  # in Pascals
-
-# Example usage:
-delta_p = pressure_loss(D=0.05, L=100, Q=0.02, mu=1e-3, rho=1000, g=sc.g, h=10, K=2, roughness=0.0000015)
-print(f"Pressure loss: {delta_p/1e5} bar")
