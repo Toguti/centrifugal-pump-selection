@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as sc
-from pressure_loss import pressure_loss
+from pressure_drop.pressure_loss import pressure_loss
 from CoolProp.CoolProp import PropsSI
 
 D = 0.05  # Diameter of the pipe[m]
@@ -18,7 +18,7 @@ roughness = 0.0003  # Roughness of the pipe
 print(rho, mu)
 
 # Create a range of flow rates from 0.1 to 10 m^3/h in increments of 0.1, then convert to m^3/s
-flow_rates = np.linspace(1, 500, 10) / 3600
+flow_rates = np.linspace(5, 500, 10) / 3600
 
 # Calculate the corresponding pressure losses
 head_losses = [pressure_loss(D, L, Q, mu, rho, g, h, K, roughness)/rho/g for Q in flow_rates]

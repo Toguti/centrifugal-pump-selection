@@ -14,8 +14,8 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
     """
     # Initial guess (Churchill's formula)
     epsilon = roughness / D  # Relative roughness
-    f = (8*((8/Re)**12 + (2.457*np.log(1/((7/Re)**0.9 + 0.27*(epsilon))))**1.5)**(1/12))**2
-   
+    # f = (8*((8/Re)**12 + (2.457*np.log(1/((7/Re)**0.9 + 0.27*(epsilon))))**1.5)**(1/12))**2
+    f = 0.02
 
     # Simple Fixed-Point Iteration
     for _ in range(max_iter):
