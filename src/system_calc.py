@@ -133,8 +133,6 @@ class MainWindow(QMainWindow):
 
 
     def addConnection(self):
-        
-
         self.list_layout.addWidget(QLabel(str(self.counter)),self.counter,0)
         self.list_layout.addWidget(QLabel(self.component_list.currentText()),self.counter,1)
         self.list_layout.addWidget(QLabel(str(self.quantity.value())),self.counter,2)
