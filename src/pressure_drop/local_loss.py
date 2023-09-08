@@ -11,8 +11,11 @@ def get_singularity_value(size, element):
     return dt_equiv_lenght.loc[size,element]
 
 def sum_equivalent_length(data):
-    
-    None
+    total = 0
+    for el in data:
+        total += get_singularity_value(size_dict[el[2]],el[1])*el[3]
+    print("Soma de perda Equivalente")
+    return total
 
 options = ['ct_90_rl', 
            'ct_90_rm', 
@@ -52,5 +55,6 @@ size_dict = {
     "350 (14\")": 350,
 }
 
-print(get_singularity_value(32 ,"ct_90_rl"))
+print(dt_equiv_lenght)
+print(dt_equiv_lenght.dtypes)
 

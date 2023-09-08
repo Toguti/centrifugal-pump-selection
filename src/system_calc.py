@@ -11,9 +11,9 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QGridLayout
 )
-# from pressure_drop.local_loss import *
-
 import sys
+from pressure_drop.local_loss import *
+
 
 
 class MainWindow(QMainWindow):
@@ -133,18 +133,20 @@ class MainWindow(QMainWindow):
 
 
     def addConnection(self):
+        
+
         self.list_layout.addWidget(QLabel(str(self.counter)),self.counter,0)
         self.list_layout.addWidget(QLabel(self.component_list.currentText()),self.counter,1)
         self.list_layout.addWidget(QLabel(str(self.quantity.value())),self.counter,2)
         self.list_layout.addWidget(QLabel(str(self.size.currentText())),self.counter,3)
         self.list_layout.addWidget(QLabel("Botaos"),self.counter,4)
-        self.user_circuit.append([self.counter,self.component_list.currentText(),self.quantity.value()])
+        self.user_circuit.append([self.counter,self.component_list.currentText(), self.size.currentText(),self.quantity.value()])
         self.counter += 1
         print(self.user_circuit)
 
     def calculate(self):
-        
-        print("Calculate!")
+        eq_length = sum_equivalent_length(self.user_circuit)
+        print(eq_length)
         
 app = QApplication(sys.argv)
 window = MainWindow()
