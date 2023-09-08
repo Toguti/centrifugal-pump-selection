@@ -23,7 +23,6 @@ class MainWindow(QMainWindow):
         button = QPushButton("Next")
         self.setCentralWidget(button)
 
-    def the_button
 
 # Initialize Aplication
 
