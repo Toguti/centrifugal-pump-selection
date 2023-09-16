@@ -1,4 +1,7 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import (Qt, 
+                          QSize, 
+                          QAbstractTableModel
+                          )
 from PyQt6.QtWidgets import (
     QApplication,
     QDoubleSpinBox,
@@ -9,55 +12,74 @@ from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
     QPushButton,
-    QGridLayout
+    QGridLayout,
+    QTableView,
+    QLineEdit
 )
 import sys
 from pressure_drop.local_loss import *
 
 
+class InputTable(QAbstractTableModel):
+    def __init__(self, data):
+        super(InputTable, self).__init__()
+        self._data = data
+
+    def data (self, index, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._data[index.row()][index.column()]
+        
+
+    def rowCount(self, index):
+        return len(self._data)
+    
+    def columnCount(self,index):
+        return len(self._data[0])
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # Variables
-        self.counter = 1
+
 
         # Main window Layout
         self.setWindowTitle("Pressure Loss Calculator")
+        self.setMinimumSize(QSize(600, 720))
 
         # User input widget
         user_input_layout = QGridLayout()
-
-
         user_input_layout.addWidget(QLabel("Index"),0,0)
         user_input_layout.addWidget(QLabel("Conexão"),0,1)
-        user_input_layout.addWidget(QLabel("Diâmetro"),0,2)
-        user_input_layout.addWidget(QLabel("Quantidade"),0,3)
+        user_input_layout.addWidget(QLabel("Quantidade"),0,2)
+        user_input_layout.addWidget(QLabel("Diâmetro"),0,3)
+        user_input_layout.addWidget(QLabel("Vazão"),0,4)
 
-        
-        user_input_layout.addWidget(QLabel(str(self.counter)),1,0)
+        self.path_index = QDoubleSpinBox()
+        self.path_index.setValue(1)
+        self.path_index.setMinimum(0)
+        self.path_index.setDecimals(0)
+        user_input_layout.addWidget(self.path_index,1,0)
         self.component_list = QComboBox()
         self.component_list.addItems(
             ['ct_90_rl', 
-           'ct_90_rm', 
-           'ct_90_rc', 
-           'ct_45', 
-           'cur_90_1_1-2', 
-           'cur_90_1', 
-           'cur_45', 
-           'ent_norm', 
-           'ent_borda', 
-           'rg_ga_a', 
-           'rg_gb_a', 
-           'rg_an_a', 
-           'te_main', 
-           'te_deriv', 
-           'te_div', 
-           'val_pec', 
-           'sai_can', 
-           'valv_ret_leve', 
-           'valv_ret_pesado',
-           'outro'])
+            'ct_90_rm', 
+            'ct_90_rc', 
+            'ct_45', 
+            'cur_90_1_1-2', 
+            'cur_90_1', 
+            'cur_45', 
+            'ent_norm', 
+            'ent_borda', 
+            'rg_ga_a', 
+            'rg_gb_a', 
+            'rg_an_a', 
+            'te_main', 
+            'te_deriv', 
+            'te_div', 
+            'val_pec', 
+            'sai_can', 
+            'valv_ret_leve', 
+            'valv_ret_pesado',
+            'outro'])
         user_input_layout.addWidget(self.component_list,1,1)
 
         # Quantity
@@ -68,8 +90,8 @@ class MainWindow(QMainWindow):
         user_input_layout.addWidget(self.quantity,1,2)
 
         # Size
-        self.size = QComboBox()
-        self.size.addItems([
+        self.c_size = QComboBox()
+        self.c_size.addItems([
             "13 (1/2\")",
             "19 (3/4\")",
             "25 (1\")",
@@ -84,42 +106,41 @@ class MainWindow(QMainWindow):
             "200 (8\")",
             "250 (10\")",
             "300 (12\")",
-            "350 (14\")",
+            "350 (14\")"
         ])
-        user_input_layout.addWidget(self.size,1,3)
+        user_input_layout.addWidget(self.c_size,1,3)
+
+        # Path Flow
+        self.flow = QDoubleSpinBox()
+        self.flow.setMinimum(0)
+        self.flow.setMaximum(100000)
+        self.flow.setDecimals(2)
+        self.flow.setSuffix("m³/h")
+        user_input_layout.addWidget(self.flow,1,4)
 
         # Add Button
         add_button = QPushButton("Adicionar")
         add_button.clicked.connect(self.addConnection)
-        user_input_layout.addWidget(add_button,1,4)
+        user_input_layout.addWidget(add_button,1,5)
         top_widget = QWidget()
         top_widget.setLayout(user_input_layout)
 
-        # System Layout
-        self.list_layout = QGridLayout()
-        self.list_layout.addWidget(QLabel("Index"),0,0)
-        self.list_layout.addWidget(QLabel("Conexão"),0,1)
-        self.list_layout.addWidget(QLabel("Quantidade"),0,2)
-        self.list_layout.addWidget(QLabel("Diâmetro"),0,3)
-        self.list_layout.addWidget(QLabel("Botaos"),0,4)
-        list_widget = QWidget()
-        list_widget.setLayout(self.list_layout)
-        
-        # buttons Widget
+        # Table
+        self.table = QTableView()
+        table_header = [["Trecho", "Conexão", "Quantidade/Comprimento", "Diâmetro", "Vazão", "Botãos"]]
+        self.model = InputTable(table_header)  
+        self.table.setModel(self.model)      
+
+        # Bottom Widget
         calculate_button = QPushButton("Calcular")
         calculate_button.clicked.connect(self.calculate)
-
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(calculate_button)
-        
-        bottom_widget = QWidget()
-        bottom_widget.setLayout(button_layout)
 
         # Main Widget
         vertical_layout = QVBoxLayout()
         vertical_layout.addWidget(top_widget)
-        vertical_layout.addWidget(list_widget)
-        vertical_layout.addWidget(bottom_widget)
+        vertical_layout.addWidget(self.table)
+        vertical_layout.addWidget(calculate_button)
+        
 
         main_widget = QWidget()
         main_widget.setLayout(vertical_layout)
@@ -133,19 +154,19 @@ class MainWindow(QMainWindow):
 
 
     def addConnection(self):
-        self.list_layout.addWidget(QLabel(str(self.counter)),self.counter,0)
-        self.list_layout.addWidget(QLabel(self.component_list.currentText()),self.counter,1)
-        self.list_layout.addWidget(QLabel(str(self.quantity.value())),self.counter,2)
-        self.list_layout.addWidget(QLabel(str(self.size.currentText())),self.counter,3)
-        self.list_layout.addWidget(QLabel("Botaos"),self.counter,4)
-        self.user_circuit.append([self.counter,self.component_list.currentText(), self.size.currentText(),self.quantity.value()])
-        self.counter += 1
-        print(self.user_circuit)
+        current_index = self.path_index.value()
+        current_quantity = self.quantity.value()
+        current_component = self.component_list.currentText()
+        current_size = self.c_size.currentText()
+        current_flow = self.flow.value()
+        self.user_circuit.append([current_index, current_component, current_size, current_quantity, current_flow])
+        self.model._data.append((current_index, current_component, current_quantity, current_size, current_flow,"Botaos"))
+        self.model.layoutChanged.emit()
 
     def calculate(self):
-        eq_length = sum_equivalent_length(self.user_circuit)
-        print(eq_length)
-        
+        eq_length = plotSystemPoint(self.user_circuit)
+        None
+
 app = QApplication(sys.argv)
 window = MainWindow()
 window.show()

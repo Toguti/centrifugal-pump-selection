@@ -63,6 +63,9 @@ def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
     h_g = h 
 
     # Total pressure loss
-    delta_p = rho * g * (h_f + h_s + h_g)
+    delta_p = (h_f + h_s + h_g)
 
     return delta_p  # in Pascals
+
+def calculate_pressure_loss():
+    None

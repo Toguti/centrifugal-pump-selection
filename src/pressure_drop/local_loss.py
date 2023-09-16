@@ -1,6 +1,7 @@
 import pandas as pd
-
-dt_equiv_lenght = pd.read_csv("./src/data/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
+from pressure_drop.pressure_loss import pressure_loss
+import matplotlib.pyplot as plt
+dt_equiv_lenght = pd.read_csv("./src/db/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
 
 type(dt_equiv_lenght)
 # print(dt_equiv_lenght)
@@ -8,6 +9,7 @@ type(dt_equiv_lenght)
 
 
 def get_singularity_value(size, element):
+    
     return dt_equiv_lenght.loc[size,element]
 
 def sum_equivalent_length(data):
@@ -17,9 +19,25 @@ def sum_equivalent_length(data):
             total[el[2]] += get_singularity_value(size_dict[el[2]],el[1])*el[3]
         else:
             total[el[2]] = get_singularity_value(size_dict[el[2]],el[1])*el[3]
-    print("Soma de perda Equivalente")
     return total
 
+def plotSystemPoint(data):
+    flow_data = []
+    total_head = 0
+    for el in data:
+        component = el[1]
+        c_size = el[2]
+        quantity = el[3]
+        flow = el[4]
+        flow_data.append(flow)
+        total_head += pressure_loss(size_dict[c_size]/1000, get_singularity_value(size_dict[c_size],component) * quantity , flow/3600, 0.001, 1000, 9.81, 0, 0, 0.00015) 
+        print(component, c_size, quantity, flow)
+    plt.plot(max(flow_data), total_head, marker='o')  # Multiply flow rates by 3600 to convert back to m^3/h for the plot
+    plt.xlabel('Volumetric flow rate (m^3/h)')
+    plt.ylabel('Total head loss (m)')
+    plt.title('Head loss vs Flow rate for a circular pipe')
+    plt.grid(True)
+    plt.show()
 options = ['ct_90_rl', 
            'ct_90_rm', 
            'ct_90_rc', 
@@ -57,7 +75,3 @@ size_dict = {
     "300 (12\")": 300,
     "350 (14\")": 350,
 }
-
-print(dt_equiv_lenght)
-print(dt_equiv_lenght.dtypes)
-
