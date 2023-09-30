@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 import sys
 from pressure_drop.local_loss import *
+from pressure_drop.total_head_loss import *
 
 
 class InputTable(QAbstractTableModel):
@@ -43,7 +44,7 @@ class MainWindow(QMainWindow):
 
         # Main window Layout
         self.setWindowTitle("Pressure Loss Calculator")
-        self.setMinimumSize(QSize(600, 720))
+        self.setMinimumSize(QSize(1000, 720))
 
         # User input widget
         user_input_layout = QGridLayout()
@@ -51,7 +52,6 @@ class MainWindow(QMainWindow):
         user_input_layout.addWidget(QLabel("Conexão"),0,1)
         user_input_layout.addWidget(QLabel("Quantidade"),0,2)
         user_input_layout.addWidget(QLabel("Diâmetro"),0,3)
-        user_input_layout.addWidget(QLabel("Vazão"),0,4)
 
         self.path_index = QDoubleSpinBox()
         self.path_index.setValue(1)
@@ -110,13 +110,13 @@ class MainWindow(QMainWindow):
         ])
         user_input_layout.addWidget(self.c_size,1,3)
 
-        # Path Flow
-        self.flow = QDoubleSpinBox()
-        self.flow.setMinimum(0)
-        self.flow.setMaximum(100000)
-        self.flow.setDecimals(2)
-        self.flow.setSuffix("m³/h")
-        user_input_layout.addWidget(self.flow,1,4)
+        # # Path Flow
+        # self.flow = QDoubleSpinBox()
+        # self.flow.setMinimum(0)
+        # self.flow.setMaximum(100000)
+        # self.flow.setDecimals(2)
+        # self.flow.setSuffix("m³/h")
+        # user_input_layout.addWidget(self.flow,1,4)
 
         # Add Button
         add_button = QPushButton("Adicionar")
@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
 
         # Table
         self.table = QTableView()
-        table_header = [["Trecho", "Conexão", "Quantidade/Comprimento", "Diâmetro", "Vazão", "Botãos"]]
+        table_header = [["Trecho", "Conexão", "Quantidade/Comprimento", "Diâmetro", "Botãos"]]
         self.model = InputTable(table_header)  
         self.table.setModel(self.model)      
 
@@ -158,13 +158,15 @@ class MainWindow(QMainWindow):
         current_quantity = self.quantity.value()
         current_component = self.component_list.currentText()
         current_size = self.c_size.currentText()
-        current_flow = self.flow.value()
-        self.user_circuit.append([current_index, current_component, current_size, current_quantity, current_flow])
-        self.model._data.append((current_index, current_component, current_quantity, current_size, current_flow,"Botaos"))
+        self.user_circuit.append([current_index, current_component, current_size, current_quantity,])
+        self.model._data.append((current_index, current_component, current_quantity, current_size,"Botaos"))
         self.model.layoutChanged.emit()
 
-    def calculate(self):
-        eq_length = plotSystemPoint(self.user_circuit)
+    def calculate(self, max_flow=10, T_user=25, P_user=101325,fluid='INCOMP::Water'):
+        fluid_properties = fluidProp(T_user, P_user, fluid)
+        max_flow = 10
+        plotCurve(self.user_circuit, max_flow, fluid_properties)
+
         None
 
 app = QApplication(sys.argv)
