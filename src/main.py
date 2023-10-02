@@ -20,6 +20,7 @@ import sys
 from pressure_drop.local_loss import *
 from pressure_drop.total_head_loss import *
 from UI.system_calc import InputTable
+from UI.fluid_system_input import fluid_system_input
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -119,8 +120,16 @@ class MainWindow(QMainWindow):
         calculate_button = QPushButton("Calcular")
         calculate_button.clicked.connect(self.calculate)
 
+        # System Input
+        system_input = fluid_system_input()
+
+        # Input Section
+        input = fluid_system_input()
+
         # Main Widget
         vertical_layout = QVBoxLayout()
+
+        vertical_layout.addWidget(input)
         vertical_layout.addWidget(top_widget)
         vertical_layout.addWidget(self.table)
         vertical_layout.addWidget(calculate_button)
