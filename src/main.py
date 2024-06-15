@@ -1,29 +1,20 @@
-from PyQt6.QtCore import (Qt, 
-                          QSize, 
-                          QAbstractTableModel
+from PyQt6.QtCore import (QSize
                           )
 from PyQt6.QtWidgets import (
     QApplication,
-    QDoubleSpinBox,
     QMainWindow,
-    QHBoxLayout,
     QVBoxLayout,
     QWidget,
-    QLabel,
-    QComboBox,
-    QPushButton,
-    QGridLayout,
-    QTableView,
-    QLineEdit,
-    QTableWidget,
-    QTabWidget
+    QTabWidget,
+    QMessageBox
+)
+from PyQt6.QtGui import (
+    QAction
 )
 import sys
-from pressure_drop.local_loss import *
-from pressure_drop.total_head_loss import *
 from UI.system_calc import InputTable
-from UI.fluid_system_input import fluid_system_input
-
+from UI.fluid_prop_input import FluidPropInput
+from UI.pipe_table_widget import PipeTableWidget
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -58,10 +49,13 @@ class MainWindow(QMainWindow):
         pump_selection_tab_layout = QVBoxLayout(pump_selection_tab)
 
         ## Fluid properties tab configuration ##
-        
+        fluid_prop_input_widget = FluidPropInput()
+        fluid_prop_tab_layout.addWidget(fluid_prop_input_widget)
 
         ## Sytem input tab configuration ##
         
+        pipe_table_widget = PipeTableWidget(2, 26)
+        system_input_tab_layout.addWidget(pipe_table_widget)
         
         ## Pump seleciton tab configuration ##
 
@@ -87,6 +81,10 @@ class MainWindow(QMainWindow):
         # main_widget = QWidget()
         # main_widget.setLayout(vertical_layout)
 
+       
+
+
+
         # Memory
         self.user_circuit = [] 
 
@@ -94,6 +92,10 @@ class MainWindow(QMainWindow):
         # to take up all the space in the window by default.
         central_layout.addWidget(tab_widget)
         
+        ## Create the menu bar
+        self.createMenuBar()
+
+
     def calculate(self, max_flow=10, T_user=25, P_user=101325,fluid='INCOMP::Water'):
         fluid_properties = fluidProp(T_user, P_user, fluid)
         max_flow = 10
@@ -101,8 +103,37 @@ class MainWindow(QMainWindow):
 
         None
 
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
+    def createMenuBar(self):
+        menu_bar = self.menuBar()
 
-app.exec()
+        # File menu
+        file_menu = menu_bar.addMenu("File")
+        open_action = QAction("Open", self)
+        save_action = QAction("Save", self)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(open_action)
+        file_menu.addAction(save_action)
+        file_menu.addAction(exit_action)
+
+        # Options menu
+        options_menu = menu_bar.addMenu("Options")
+        settings_action = QAction("Settings", self)
+        options_menu.addAction(settings_action)
+
+        # About menu
+        about_menu = menu_bar.addMenu("About")
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.showAboutDialog)
+        about_menu.addAction(about_action)
+
+    def showAboutDialog(self):
+        QMessageBox.about(self, "About", "This is a PyQt6 application demonstrating a rotated table.")
+
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())

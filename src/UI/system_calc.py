@@ -2,8 +2,8 @@ from PyQt6.QtCore import (Qt,
                           QSize, 
                           QAbstractTableModel
                           )
-from pressure_drop.local_loss import *
-from pressure_drop.total_head_loss import *
+from UI.func.pressure_drop.local_loss import *
+from UI.func.pressure_drop.total_head_loss import *
 
 
 class InputTable(QAbstractTableModel):

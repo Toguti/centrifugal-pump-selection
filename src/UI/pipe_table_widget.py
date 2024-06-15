@@ -1,38 +1,38 @@
-# my_table_widget.py
+# pipe_table_widget.py
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton
-from rotated_label import RotatedLabel
+from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton, QLabel
+from UI.func.rotated_label import RotatedLabel
+from UI.data.header_table_data import *
 
-class MyTableWidget(QTableWidget):
+class PipeTableWidget(QTableWidget):
     def __init__(self, rows, columns, parent=None):
         super().__init__(rows, columns, parent)
+
+        # Configure Header Row Span
+        ## 2 Collums
+        self.setSpan(0,0,2,1)
+        self.setSpan(0,3,2,1)
+        self.setSpan(0,4,2,1)
+        self.setSpan(0,24,2,1)
+        self.setSpan(0,25,2,1)
+        ## 1 Columns
+        self.setSpan(0,1,1,2)
+        self.setSpan(0,5,1,19)
+        self.setCellWidget(0,1,QLabel("Trecho"))
+        self.setCellWidget(0,5,QLabel("Quantidades"))
+
+        for col, header in enumerate(header_second_line):
+            self.setRotatedCell(1, col, header)
+
+        self.setRowHeight(1,150)
+        self.addRow()
+
+        for col in range(0,self.columnCount()):
+            self.setColumnWidth(col,15)
 
     def setRotatedCell(self, row, column, text):
         rotated_label = RotatedLabel(text)
         self.setCellWidget(row, column, rotated_label)
-
-    def populateTableFromData(self, headers, data):
-        # Set the headers horizontally
-        for col, header in enumerate(headers):
-            self.setHorizontalHeaderItem(col, QTableWidgetItem(header))
-
-        # Populate the first row with vertical headers
-        for col, header in enumerate(data[0]):
-            self.setRotatedCell(0, col, header)
-
-        # Populate the rest of the table with data
-        for row in range(1, len(data)):
-            for col in range(len(data[row])):
-                item = QTableWidgetItem(data[row][col])
-                self.setItem(row, col, item)
-
-            # Add a remove button to each data row
-            remove_button = QPushButton("Remove")
-            remove_button.clicked.connect(lambda ch, r=row: self.removeRow(r))
-            self.setCellWidget(row, len(data[row]), remove_button)
-
-        # Resize the first row height to fit the rotated text
-        self.resizeRowToContents(0)
 
     def addRow(self):
         row_position = self.rowCount()
@@ -41,7 +41,7 @@ class MyTableWidget(QTableWidget):
             self.setItem(row_position, col, QTableWidgetItem(""))
         
         # Add remove button
-        remove_button = QPushButton("Remove")
+        remove_button = QPushButton("X")
         remove_button.clicked.connect(lambda ch, r=row_position: self.removeRow(r))
         self.setCellWidget(row_position, self.columnCount() - 1, remove_button)
 
@@ -78,10 +78,7 @@ class MyTableWidget(QTableWidget):
 #         self.setSpan(0,4,2,1)
        
 #         # First Row
-#         self.setCellWidget(0,0,QLabel("Index"))
-#         self.setCellWidget(0,1,QLabel("Trecho"))
-#         self.setCellWidget(0,2,QLabel("Trecho"))
-#         self.setCellWidget(0,5,QLabel("Quantidades"))
+#         
 
 #         # Second Row
 #          # Set Items for Header

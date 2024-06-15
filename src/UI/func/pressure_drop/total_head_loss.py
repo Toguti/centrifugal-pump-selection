@@ -2,7 +2,7 @@ import numpy as np
 import scipy.constants as sc
 from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
-from pressure_drop.local_loss import size_dict, get_singularity_value
+from UI.func.pressure_drop.local_loss import size_dict, get_singularity_value
 
 ## Friction Factor - Uses the Colebrook equation for 
 
