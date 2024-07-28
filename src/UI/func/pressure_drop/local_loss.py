@@ -2,11 +2,6 @@ import pandas as pd
 
 dt_equiv_lenght = pd.read_csv("./src/db/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
 
-type(dt_equiv_lenght)
-# print(dt_equiv_lenght)
-
-
-
 def get_singularity_value(size, element):
     
     return dt_equiv_lenght.loc[size,element]

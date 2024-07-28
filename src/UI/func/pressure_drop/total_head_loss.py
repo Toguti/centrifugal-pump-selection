@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.constants as sc
-from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
 from UI.func.pressure_drop.local_loss import size_dict, get_singularity_value
 
@@ -126,12 +125,6 @@ def pressure_loss_array(D, L, Q, mu, rho, g, h, K, roughness):
     h_total = (h_f + h_s + h_g)
 
     return h_total  # in Pascals
-
-def fluidProp(T_user=25, P_user=101325, fluid='INCOMP::Water'):
-
-    # Fluid Data from Props SI
-    fluid_data = {'rho':PropsSI('D', 'T', (T_user+273.15), 'P', P_user, fluid), 'mu': PropsSI('V', 'T', (T_user+273.15), 'P', P_user, fluid)}
-    return fluid_data
 
 def plotSystemPoint(data):
     flow_data = []

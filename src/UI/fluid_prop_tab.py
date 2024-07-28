@@ -11,7 +11,7 @@ class FluidPropInput(QWidget):
         # Create combo box for "Fluido:"
         self.fluid_label = QLabel("Fluido:")
         self.fluid_combo = QComboBox()
-        self.fluid_combo.addItems(["Option 1", "Option 2", "Option 3"])  # Add your options here
+        self.fluid_combo.addItems(["Agua"])  # Add your options here
         
         # Create radio buttons
         self.radio1 = QRadioButton("Fluidos Padrões")
@@ -94,3 +94,9 @@ class FluidPropInput(QWidget):
         elif self.radio2.isChecked():
             self.mu_input.setDisabled(False)
             self.rho_input.setDisabled(False)
+
+    def change_viscosity(self, value):
+        self.mu_input.setValue(value)
+
+    def change_density(self, value):
+        self.rho_input.setValue(value)

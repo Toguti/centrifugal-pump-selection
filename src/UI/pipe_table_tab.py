@@ -1,6 +1,7 @@
 # pipe_table_widget.py
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton, QLabel
+from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton, QLabel, QSpinBox, QDoubleSpinBox
+from PyQt6.QtCore import Qt
 from UI.func.rotated_label import RotatedLabel
 from UI.data.header_table_data import *
 
@@ -29,6 +30,7 @@ class PipeTableWidget(QTableWidget):
 
         for col in range(0,self.columnCount()):
             self.setColumnWidth(col,15)
+            
 
     def setRotatedCell(self, row, column, text):
         rotated_label = RotatedLabel(text)
@@ -37,13 +39,57 @@ class PipeTableWidget(QTableWidget):
     def addRow(self):
         row_position = self.rowCount()
         self.insertRow(row_position)
+        
         for col in range(self.columnCount() - 1):  # Exclude the last column for the button
-            self.setItem(row_position, col, QTableWidgetItem(""))
+            if col==0:
+                row_index = QLabel(str(row_position-1),alignment=Qt.AlignmentFlag.AlignHCenter)
+                row_index.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+                self.setCellWidget(row_position,0,row_index)
+
+            elif col == 1 or col == 2:
+                self.setCellWidget(row_position,col,QSpinBox())
+
+            elif col == 3:
+                cell_type = QDoubleSpinBox()
+                cell_type.setMaximum(9999999)
+                cell_type.setDecimals(2)
+                cell_type.setSuffix(" m³/h")
+                if row_position != 2:
+                    cell_type.setValue(self.cellWidget(row_position-1,col).value())
+                self.setCellWidget(row_position,col,cell_type)
+
+            elif col == 4:
+                cell_type = QDoubleSpinBox()
+                cell_type.setMaximum(9999999)
+                cell_type.setDecimals(2)
+                cell_type.setSuffix(" m")
+                self.setCellWidget(row_position,col,cell_type)
+
+            else:
+                self.setCellWidget(row_position,col,QSpinBox())
+            
+
+
         
         # Add remove button
         remove_button = QPushButton("X")
         remove_button.clicked.connect(lambda ch, r=row_position: self.removeRow(r))
         self.setCellWidget(row_position, self.columnCount() - 1, remove_button)
+
+    def retriveData(self):
+        data = []
+        print(self.rowCount())
+        for row in range(2,self.rowCount()):
+            row_data = []
+            for col in range(2,self.columnCount()-1):
+                cell_widget = self.cellWidget(row,col)
+                print(cell_widget.value())
+                row_data.append(cell_widget.value())
+            data.append(row_data)
+
+        return data
+
+
 
 
 

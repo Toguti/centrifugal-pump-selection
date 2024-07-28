@@ -4,24 +4,26 @@ from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
+    QHBoxLayout,
     QWidget,
     QTabWidget,
-    QMessageBox
+    QMessageBox,
+    QPushButton
 )
 from PyQt6.QtGui import (
     QAction
 )
 import sys
 from UI.system_calc import InputTable
-from UI.fluid_prop_input import FluidPropInput
-from UI.pipe_table_widget import PipeTableWidget
+from UI.fluid_prop_tab import FluidPropInput
+from UI.pipe_table_tab import PipeTableWidget
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         # Main window Layout
         self.setWindowTitle("Seletor de Bombas")
-        self.setMinimumSize(QSize(1024, 768))
+        self.setMinimumSize(QSize(1200, 768))
   
         # Widgets
         # Center
@@ -54,8 +56,27 @@ class MainWindow(QMainWindow):
 
         ## Sytem input tab configuration ##
         
-        pipe_table_widget = PipeTableWidget(2, 26)
-        system_input_tab_layout.addWidget(pipe_table_widget)
+        self.pipe_table_widget = PipeTableWidget(2, 26)
+        system_input_tab_layout.addWidget(self.pipe_table_widget)
+
+
+        # System Input Buttons
+
+        add_row_button = QPushButton("Adicionar Linha")
+        add_row_button.clicked.connect(self.pipe_table_widget.addRow)
+
+        calculate_button = QPushButton("Calcular")
+        calculate_button.clicked.connect(self.calculate)
+
+        system_buttons_widget = QWidget()
+        system_buttons_layout = QHBoxLayout(system_buttons_widget)
+        system_buttons_layout.addWidget(add_row_button)
+        system_buttons_layout.addWidget(calculate_button)
+        system_input_tab_layout.addWidget(system_buttons_widget)
+
+
+        
+        # System Input Buttons
         
         ## Pump seleciton tab configuration ##
 
@@ -81,10 +102,6 @@ class MainWindow(QMainWindow):
         # main_widget = QWidget()
         # main_widget.setLayout(vertical_layout)
 
-       
-
-
-
         # Memory
         self.user_circuit = [] 
 
@@ -97,10 +114,10 @@ class MainWindow(QMainWindow):
 
 
     def calculate(self, max_flow=10, T_user=25, P_user=101325,fluid='INCOMP::Water'):
-        fluid_properties = fluidProp(T_user, P_user, fluid)
-        max_flow = 10
-        plotCurve(self.user_circuit, max_flow, fluid_properties)
-
+        # fluid_properties = fluidProp(T_user, P_user, fluid)
+        # max_flow = 10
+        # plotCurve(self.user_circuit, max_flow, fluid_properties)
+        print(self.pipe_table_widget.retriveData())
         None
 
     def createMenuBar(self):
