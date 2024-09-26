@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         system_input_tab_layout.addWidget(self.pipe_table_widget)
 
 
-        # System Input Buttons
+        # System Input Buttons ##
 
         add_row_button = QPushButton("Adicionar Linha")
         add_row_button.clicked.connect(self.pipe_table_widget.addRow)
@@ -113,12 +113,11 @@ class MainWindow(QMainWindow):
         self.createMenuBar()
 
 
-    def calculate(self, max_flow=10, T_user=25, P_user=101325,fluid='INCOMP::Water'):
-        # fluid_properties = fluidProp(T_user, P_user, fluid)
-        # max_flow = 10
-        # plotCurve(self.user_circuit, max_flow, fluid_properties)
-        print(self.pipe_table_widget.retriveData())
-        None
+    def calculate(self):
+        max_flow = self.pipe_table_widget.get_max_flow_value()
+        print(max_flow)
+        plotCurve(self.user_circuit, max_flow)
+
 
     def createMenuBar(self):
         menu_bar = self.menuBar()

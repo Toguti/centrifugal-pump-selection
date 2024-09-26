@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton, QLabel,
 from PyQt6.QtCore import Qt
 from UI.func.rotated_label import RotatedLabel
 from UI.data.header_table_data import *
+import pandas as pd
 
 class PipeTableWidget(QTableWidget):
     def __init__(self, rows, columns, parent=None):
@@ -29,7 +30,12 @@ class PipeTableWidget(QTableWidget):
         self.addRow()
 
         for col in range(0,self.columnCount()):
-            self.setColumnWidth(col,15)
+            if col == 4:
+                self.setColumnWidth(col,50)
+            elif col == 3:
+                self.setColumnWidth(col,80)
+            else:
+                self.setColumnWidth(col,15)
             
 
     def setRotatedCell(self, row, column, text):
@@ -47,13 +53,16 @@ class PipeTableWidget(QTableWidget):
                 self.setCellWidget(row_position,0,row_index)
 
             elif col == 1 or col == 2:
-                self.setCellWidget(row_position,col,QSpinBox())
+                cell_type = QSpinBox()
+                cell_type.setButtonSymbols(cell_type.ButtonSymbols.NoButtons)
+                self.setCellWidget(row_position,col,cell_type)
 
             elif col == 3:
                 cell_type = QDoubleSpinBox()
                 cell_type.setMaximum(9999999)
                 cell_type.setDecimals(2)
                 cell_type.setSuffix(" m³/h")
+                cell_type.setButtonSymbols(cell_type.ButtonSymbols.NoButtons)
                 if row_position != 2:
                     cell_type.setValue(self.cellWidget(row_position-1,col).value())
                 self.setCellWidget(row_position,col,cell_type)
@@ -63,6 +72,7 @@ class PipeTableWidget(QTableWidget):
                 cell_type.setMaximum(9999999)
                 cell_type.setDecimals(2)
                 cell_type.setSuffix(" m")
+                cell_type.setButtonSymbols(cell_type.ButtonSymbols.NoButtons)
                 self.setCellWidget(row_position,col,cell_type)
 
             else:
@@ -72,23 +82,25 @@ class PipeTableWidget(QTableWidget):
 
         
         # Add remove button
-        remove_button = QPushButton("X")
+        remove_button = QPushButton("Del")
         remove_button.clicked.connect(lambda ch, r=row_position: self.removeRow(r))
         self.setCellWidget(row_position, self.columnCount() - 1, remove_button)
 
     def retriveData(self):
         data = []
-        print(self.rowCount())
         for row in range(2,self.rowCount()):
             row_data = []
             for col in range(2,self.columnCount()-1):
                 cell_widget = self.cellWidget(row,col)
-                print(cell_widget.value())
                 row_data.append(cell_widget.value())
             data.append(row_data)
 
         return data
-
+    
+    def get_max_flow_value(self):
+        df = pd.DataFrame(self.retriveData())
+        return df[1].max(skipna=True)
+        
 
 
 

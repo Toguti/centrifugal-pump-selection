@@ -3,6 +3,8 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QButtonGroup, QApplication, QFormLayout
 )
 from PyQt6.QtCore import Qt
+import CoolProp
+import CoolProp.CoolProp as CP
 
 class FluidPropInput(QWidget):
     def __init__(self):
@@ -11,7 +13,9 @@ class FluidPropInput(QWidget):
         # Create combo box for "Fluido:"
         self.fluid_label = QLabel("Fluido:")
         self.fluid_combo = QComboBox()
-        self.fluid_combo.addItems(["Agua"])  # Add your options here
+        self.fluid_combo.addItems(CoolProp.__fluids__)  # Add your options here
+        self.fluid_combo.setCurrentIndex(121)
+        self.fluid_combo.currentIndexChanged.connect(self.change_values)
         
         # Create radio buttons
         self.radio1 = QRadioButton("Fluidos Padrões")
@@ -95,8 +99,15 @@ class FluidPropInput(QWidget):
             self.mu_input.setDisabled(False)
             self.rho_input.setDisabled(False)
 
-    def change_viscosity(self, value):
-        self.mu_input.setValue(value)
-
-    def change_density(self, value):
-        self.rho_input.setValue(value)
+    
+    def change_values(self):
+        try:
+            self.mu_input.setValue(CP.PropsSI('V', 'T', self.temperature_input.value() + 273.15, 'P', 101325, self.fluid_combo.currentText())*1000)
+        except ValueError:
+            print("Erro!!!! Não foi encontrado um valor de Viscosidade Dinamica para", self.fluid_combo.currentText(), "Insira um valor Manualmente")
+    
+        try:    
+            self.rho_input.setValue(CP.PropsSI('D', 'T', self.temperature_input.value() + 273.15, 'P', 101325, self.fluid_combo.currentText()))
+        except ValueError:
+            print("Erro!!!! Não foi encontrado um valor de Densidade para", self.fluid_combo.currentText(), "Insira um valor Manualmente")
+    # (self.temperature_input.value() + 273.15)
