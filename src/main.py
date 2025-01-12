@@ -14,9 +14,9 @@ from PyQt6.QtGui import (
     QAction
 )
 import sys
-from UI.system_calc import InputTable
+from UI.system_calculator import InputTable
 from UI.fluid_prop_tab import FluidPropInput
-from UI.pipe_table_tab import PipeTableWidget
+from UI.pipe_table_tab import *
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -55,8 +55,10 @@ class MainWindow(QMainWindow):
         fluid_prop_tab_layout.addWidget(fluid_prop_input_widget)
 
         ## Sytem input tab configuration ##
+        self.single_path_system_input = SinglePathInput()
+        self.pipe_table_widget = PipeTableWidget(2, 25)
         
-        self.pipe_table_widget = PipeTableWidget(2, 26)
+        system_input_tab_layout.addWidget(self.single_path_system_input)
         system_input_tab_layout.addWidget(self.pipe_table_widget)
 
 
@@ -74,34 +76,6 @@ class MainWindow(QMainWindow):
         system_buttons_layout.addWidget(calculate_button)
         system_input_tab_layout.addWidget(system_buttons_widget)
 
-
-        
-        # System Input Buttons
-        
-        ## Pump seleciton tab configuration ##
-
-        # # Bottom Widget
-        # calculate_button = QPushButton("Calcular")
-        # # calculate_button.clicked.connect(self.calculate)
-
-        # # System Input
-        # system_input = fluid_system_input()
-
-        # # Input Section
-        # input = fluid_system_input()
-
-        # # Main Widget
-        # vertical_layout = QVBoxLayout()
-
-        # vertical_layout.addWidget(input)
-        # # vertical_layout.addWidget(top_widget)
-        # vertical_layout.addWidget(self.table)
-        # vertical_layout.addWidget(calculate_button)
-        
-
-        # main_widget = QWidget()
-        # main_widget.setLayout(vertical_layout)
-
         # Memory
         self.user_circuit = [] 
 
@@ -114,9 +88,10 @@ class MainWindow(QMainWindow):
 
 
     def calculate(self):
-        max_flow = self.pipe_table_widget.get_max_flow_value()
-        print(max_flow)
-        plotCurve(self.user_circuit, max_flow)
+        system_flow = float(self.single_path_system_input.get_flow_value())
+        pipe_table_data = self.pipe_table_widget.retriveData()
+        
+
 
 
     def createMenuBar(self):
