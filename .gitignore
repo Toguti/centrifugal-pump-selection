@@ -37,4 +37,6 @@ ehthumbs.db
 Thumbs.db
 
 venv-01
+venv
+__pycache__
 .code-workspace
