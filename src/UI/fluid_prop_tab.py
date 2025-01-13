@@ -3,8 +3,6 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QButtonGroup, QApplication, QFormLayout
 )
 from PyQt6.QtCore import Qt
-import CoolProp
-import CoolProp.CoolProp as CP
 
 class FluidPropInput(QWidget):
     def __init__(self):
@@ -13,8 +11,7 @@ class FluidPropInput(QWidget):
         # Create combo box for "Fluido:"
         self.fluid_label = QLabel("Fluido:")
         self.fluid_combo = QComboBox()
-        self.fluid_combo.addItems(CoolProp.__fluids__)  # Add your options here
-        self.fluid_combo.setCurrentIndex(121)
+        self.fluid_combo.addItems(["Água"])  # Add your options here
         self.fluid_combo.currentIndexChanged.connect(self.change_values)
         
         # Create radio buttons

@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.constants as sc
 import matplotlib.pyplot as plt
 from UI.func.pressure_drop.local_loss import size_dict, get_singularity_value
 
@@ -11,7 +10,7 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
     roughness: Absolute roughness of the pipe
     D: Diameter of the pipe
     tol: Tolerance for stopping criterion.
-    max_iter: Maximum number of iterations
+    max_iter: Maximum number of iterations=
     """
     # Initial guess (Churchill's formula)
     epsilon = roughness / D  # Relative roughness

@@ -1,4 +1,4 @@
-from PyQt6.QtCore import (QSize
+from PyQt6.QtCore import (QSize, 
                           )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QTabWidget,
     QMessageBox,
-    QPushButton
+    QPushButton,
 )
 from PyQt6.QtGui import (
     QAction
@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # Main window Layout
-        self.setWindowTitle("Seletor de Bombas")
+        self.setWindowTitle("Selecionador de Bombas")
         self.setMinimumSize(QSize(1200, 768))
   
         # Widgets
@@ -55,24 +55,15 @@ class MainWindow(QMainWindow):
         fluid_prop_tab_layout.addWidget(fluid_prop_input_widget)
 
         ## Sytem input tab configuration ##
-        self.single_path_system_input = SinglePathInput()
-        self.pipe_table_widget = PipeTableWidget(2, 25)
-        
-        system_input_tab_layout.addWidget(self.single_path_system_input)
-        system_input_tab_layout.addWidget(self.pipe_table_widget)
 
 
         # System Input Buttons ##
-
-        add_row_button = QPushButton("Adicionar Linha")
-        add_row_button.clicked.connect(self.pipe_table_widget.addRow)
 
         calculate_button = QPushButton("Calcular")
         calculate_button.clicked.connect(self.calculate)
 
         system_buttons_widget = QWidget()
         system_buttons_layout = QHBoxLayout(system_buttons_widget)
-        system_buttons_layout.addWidget(add_row_button)
         system_buttons_layout.addWidget(calculate_button)
         system_input_tab_layout.addWidget(system_buttons_widget)
 
@@ -88,8 +79,9 @@ class MainWindow(QMainWindow):
 
 
     def calculate(self):
-        system_flow = float(self.single_path_system_input.get_flow_value())
-        pipe_table_data = self.pipe_table_widget.retriveData()
+        # system_flow = float(self.single_path_system_input.get_flow_value())
+        # pipe_table_data = self.pipe_table_widget.retriveData()
+        print("Botão Calcular foi Ativado")
         
 
 
