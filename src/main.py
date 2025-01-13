@@ -51,11 +51,14 @@ class MainWindow(QMainWindow):
         pump_selection_tab_layout = QVBoxLayout(pump_selection_tab)
 
         ## Fluid properties tab configuration ##
+
         fluid_prop_input_widget = FluidPropInput()
         fluid_prop_tab_layout.addWidget(fluid_prop_input_widget)
 
         ## Sytem input tab configuration ##
-
+    	
+        system_input_widget = SystemInputWidget()
+        system_input_tab_layout.addWidget(system_input_widget)
 
         # System Input Buttons ##
 
