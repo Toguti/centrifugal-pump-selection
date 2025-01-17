@@ -57,8 +57,8 @@ class MainWindow(QMainWindow):
 
         ## Sytem input tab configuration ##
     	
-        system_input_widget = SystemInputWidget()
-        system_input_tab_layout.addWidget(system_input_widget)
+        self.system_input_widget = SystemInputWidget()
+        system_input_tab_layout.addWidget(self.system_input_widget)
 
         # System Input Buttons ##
 
@@ -84,7 +84,8 @@ class MainWindow(QMainWindow):
     def calculate(self):
         # system_flow = float(self.single_path_system_input.get_flow_value())
         # pipe_table_data = self.pipe_table_widget.retriveData()
-        print("Botão Calcular foi Ativado")
+        a = self.system_input_widget.get_spinbox_values_sucction
+        print(a)
         
 
 

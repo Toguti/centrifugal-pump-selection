@@ -27,224 +27,65 @@ class SystemInputWidget(QWidget):
         discharge_input_box_layout = QVBoxLayout()
         # Aqui eu preciso adicionar um QWidget com Layout Horizontal com um QLabel e um QText para cada tipo de perda de carga localizada
 
-        ####
-        sucction_pipe_length_box_label = QLabel("Trecho Retilíneo")
-        self.sucction_pipe_length_box_value = QDoubleSpinBox()
-        self.sucction_pipe_length_box_value.setMaximumWidth(100)
-        self.sucction_pipe_length_box_value.setDecimals(2)
-        self.sucction_pipe_length_box_value.setValue(54.20)
-        sucction_pipe_length_box_layout = QHBoxLayout()
-        sucction_pipe_length_box_layout.addWidget(sucction_pipe_length_box_label)
-        sucction_pipe_length_box_layout.addWidget(self.sucction_pipe_length_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_pipe_length_box_layout)
-
-        ####
-        sucction_height_dif_box_label = QLabel("Diferença de Altura")
-        self.sucction_height_dif_box_value = QSpinBox()
-        self.sucction_height_dif_box_value.setMaximumWidth(100)
-        self.sucction_height_dif_box_value.setValue(2)
-        sucction_height_dif_box_layout = QHBoxLayout()
-        sucction_height_dif_box_layout.addWidget(sucction_height_dif_box_label)
-        sucction_height_dif_box_layout.addWidget(self.sucction_height_dif_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_height_dif_box_layout)
-
-        ####
-        sucction_elbow_90_lr_box_label = QLabel("Cotovelo 90° Raio Longo")
-        self.sucction_elbow_90_lr_box_value = QSpinBox()
-        self.sucction_elbow_90_lr_box_value.setMaximumWidth(100)
-        sucction_elbow_90_lr_box_layout = QHBoxLayout()
-        sucction_elbow_90_lr_box_layout.addWidget(sucction_elbow_90_lr_box_label)
-        sucction_elbow_90_lr_box_layout.addWidget(self.sucction_elbow_90_lr_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_elbow_90_lr_box_layout)
-
-        ####
-        sucction_elbow_90_mr_box_label = QLabel("Cotovelo 90° Raio Medio")
-        self.sucction_elbow_90_mr_box_value = QSpinBox()
-        self.sucction_elbow_90_mr_box_value.setMaximumWidth(100)
-        sucction_elbow_90_mr_box_layout = QHBoxLayout()
-        sucction_elbow_90_mr_box_layout.addWidget(sucction_elbow_90_mr_box_label)
-        sucction_elbow_90_mr_box_layout.addWidget(self.sucction_elbow_90_mr_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_elbow_90_mr_box_layout)
-
-        ####
-        sucction_elbow_90_sr_box_label = QLabel("Cotovelo 90° Raio Curto")
-        self.sucction_elbow_90_sr_box_value = QSpinBox()
-        self.sucction_elbow_90_sr_box_value.setMaximumWidth(100)
-        sucction_elbow_90_sr_box_layout = QHBoxLayout()
-        sucction_elbow_90_sr_box_layout.addWidget(sucction_elbow_90_sr_box_label)
-        sucction_elbow_90_sr_box_layout.addWidget(self.sucction_elbow_90_sr_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_elbow_90_sr_box_layout)
-
-        ####
-        sucction_elbow_45_box_label = QLabel("Cotovelo 45°")
-        self.sucction_elbow_45_box_value = QSpinBox()
-        self.sucction_elbow_45_box_value.setMaximumWidth(100)
-        sucction_elbow_45_box_layout = QHBoxLayout()
-        sucction_elbow_45_box_layout.addWidget(sucction_elbow_45_box_label)
-        sucction_elbow_45_box_layout.addWidget(self.sucction_elbow_45_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_elbow_45_box_layout)
-
-        ####
-        sucction_curve_90_rl_box_label = QLabel("Curva 90° Raio Longo")
-        self.sucction_curve_90_rl_box_value = QSpinBox()
-        self.sucction_curve_90_rl_box_value.setMaximumWidth(100)
-        sucction_curve_90_rl_box_layout = QHBoxLayout()
-        sucction_curve_90_rl_box_layout.addWidget(sucction_curve_90_rl_box_label)
-        sucction_curve_90_rl_box_layout.addWidget(self.sucction_curve_90_rl_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_curve_90_rl_box_layout)
+        # Nomes de cada componente do input
+        input_labels = ["Trecho Retilineo", "Diferença de Altura", "Cotovelo 90° Raio Longo", "Cotovelo 90° Raio Médio", "Cotovelo 90° Raio Curto",
+        "Cotovelo 45°", "Curva 90° Raio Longo", "Curva 90° Raio Curto", "Curva 45°", "Entrada Normal", "Entrada de Borda",
+        "Válvula Gaveta Aberta", "Válvula Globo Aberta", "Válvula Ângular Aberta", "Passagem Reta Tê",
+        "Derivação Tê", "Bifurcação Tê", "Válvula de Pé e Crivo", "Saída de Canalização",
+        "Válvula de Retenção Leve", "Válvula de Retenção Pesado"] # Dados de Entrada
         
-        ####
-        sucction_curve_90_sr_box_label = QLabel("Curva 90° Raio Curto")
-        self.sucction_curve_90_sr_box_value = QSpinBox()
-        self.sucction_curve_90_sr_box_value.setMaximumWidth(100)
-        sucction_curve_90_sr_box_layout = QHBoxLayout()
-        sucction_curve_90_sr_box_layout.addWidget(sucction_curve_90_sr_box_label)
-        sucction_curve_90_sr_box_layout.addWidget(self.sucction_curve_90_sr_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_curve_90_sr_box_layout)
-
-        ####
-        sucction_curve_45_label = QLabel("Curva 45°")
-        self.sucction_curve_45_value = QSpinBox()
-        self.sucction_curve_45_value.setMaximumWidth(100)
-        sucction_curve_45_layout = QHBoxLayout()
-        sucction_curve_45_layout.addWidget(sucction_curve_45_label)
-        sucction_curve_45_layout.addWidget(self.sucction_curve_45_value)
-
-        sucction_input_box_layout.addLayout(sucction_curve_45_layout)
-
-        ####
-        sucction_norm_entr_label = QLabel("Entrada Arredondada")
-        self.sucction_norm_entr_value = QSpinBox()
-        self.sucction_norm_entr_value.setMaximumWidth(100)
-        sucction_norm_entr_layout = QHBoxLayout()
-        sucction_norm_entr_layout.addWidget(sucction_norm_entr_label)
-        sucction_norm_entr_layout.addWidget(self.sucction_norm_entr_value)
-
-        sucction_input_box_layout.addLayout(sucction_norm_entr_layout)
-
-        ####
-        sucction_entr_bord_label = QLabel("Entrada de Borda")
-        self.sucction_entr_bord_value = QSpinBox()
-        self.sucction_entr_bord_value.setMaximumWidth(100)
-        sucction_entr_bord_layout = QHBoxLayout()
-        sucction_entr_bord_layout.addWidget(sucction_entr_bord_label)
-        sucction_entr_bord_layout.addWidget(self.sucction_entr_bord_value)
-
-        sucction_input_box_layout.addLayout(sucction_entr_bord_layout)
-
-        ####
-        sucction_gate_valve_open_box_label = QLabel("Válvula Gaveta Aberta")
-        self.sucction_gate_valve_open_box_value = QSpinBox()
-        self.sucction_gate_valve_open_box_value.setMaximumWidth(100)
-        sucction_gate_valve_open_box_layout = QHBoxLayout()
-        sucction_gate_valve_open_box_layout.addWidget(sucction_gate_valve_open_box_label)
-        sucction_gate_valve_open_box_layout.addWidget(self.sucction_gate_valve_open_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_gate_valve_open_box_layout)
-
-        ####
-        sucction_curve_90_sr_box_label = QLabel("Válvula Angular Aberta")
-        self.sucction_curve_90_sr_box_value = QSpinBox()
-        self.sucction_curve_90_sr_box_value.setMaximumWidth(100)
-        sucction_curve_90_sr_box_layout = QHBoxLayout()
-        sucction_curve_90_sr_box_layout.addWidget(sucction_curve_90_sr_box_label)
-        sucction_curve_90_sr_box_layout.addWidget(self.sucction_curve_90_sr_box_value)
-
-        sucction_input_box_layout.addLayout(sucction_curve_90_sr_box_layout)
-
-
-        ##------------------------------------------##
-
-        ####
-        discharge_pipe_length_box_label = QLabel("Trecho Retilíneo")
-        self.discharge_pipe_length_box_value = QDoubleSpinBox()
-        self.discharge_pipe_length_box_value.setMaximumWidth(100)
-        self.discharge_pipe_length_box_value.setDecimals(2)
-        self.discharge_pipe_length_box_value.setValue(54.20)
-        discharge_pipe_length_box_layout = QHBoxLayout()
-        discharge_pipe_length_box_layout.addWidget(discharge_pipe_length_box_label)
-        discharge_pipe_length_box_layout.addWidget(self.discharge_pipe_length_box_value)
-
+        # Criar o valor inicial de cada input para testes
+        input_values = [0 for element in range(21)] # mesmo tamamho do input_labels
         
-        discharge_input_box_layout.addLayout(discharge_pipe_length_box_layout)
+        self.spin_boxes_sucction = []
+        self.spin_boxes_discharge = []
 
-        ####
-        discharge_height_dif_box_label = QLabel("Diferença de Altura")
-        self.discharge_height_dif_box_value = QSpinBox()
-        self.discharge_height_dif_box_value.setMaximumWidth(100)
-        discharge_height_dif_box_layout = QHBoxLayout()
-        discharge_height_dif_box_layout.addWidget(discharge_height_dif_box_label)
-        discharge_height_dif_box_layout.addWidget(self.discharge_height_dif_box_value)
+        # Loop que cria o layout da entrada do input da sucção
+        for label, value in zip(input_labels, input_values):
+            # Horizontal layout for each pair
+            h_layout = QHBoxLayout()
 
-        discharge_input_box_layout.addLayout(discharge_height_dif_box_layout)
+            # Create QLabel
+            label = QLabel(label)
 
-        ####
-        discharge_elbow_90_lr_box_label = QLabel("Cotovelo 90° Raio Longo")
-        self.discharge_elbow_90_lr_box_value = QSpinBox()
-        self.discharge_elbow_90_lr_box_value.setMaximumWidth(100)
-        discharge_elbow_90_lr_box_layout = QHBoxLayout()
-        discharge_elbow_90_lr_box_layout.addWidget(discharge_elbow_90_lr_box_label)
-        discharge_elbow_90_lr_box_layout.addWidget(self.discharge_elbow_90_lr_box_value)
+            # Create QSpinBox
+            spin_box = QDoubleSpinBox()
+            spin_box.setValue(value)
+            spin_box.setDecimals(0)
+            if label == "Trecho Retilineo":
+                spin_box.setDecimals(2)
 
-        discharge_input_box_layout.addLayout(discharge_elbow_90_lr_box_layout)
+            # Adicionar uma referência ao spin_box
+            self.spin_boxes_sucction.append(spin_box)
 
-        ####
-        discharge_elbow_90_mr_box_label = QLabel("Cotovelo 90° Raio Medio")
-        self.discharge_elbow_90_mr_box_value = QSpinBox()
-        self.discharge_elbow_90_mr_box_value.setMaximumWidth(100)
-        discharge_elbow_90_mr_box_layout = QHBoxLayout()
-        discharge_elbow_90_mr_box_layout.addWidget(discharge_elbow_90_mr_box_label)
-        discharge_elbow_90_mr_box_layout.addWidget(self.discharge_elbow_90_mr_box_value)
+            # Adicionar os widgets no layout horizontal
+            h_layout.addWidget(label)
+            h_layout.addWidget(spin_box)
 
-        discharge_input_box_layout.addLayout(discharge_elbow_90_mr_box_layout)
+            sucction_input_box_layout.addLayout(h_layout)
 
-        ####
-        discharge_elbow_90_sr_box_label = QLabel("Cotovelo 90° Raio Curto")
-        self.discharge_elbow_90_sr_box_value = QSpinBox()
-        self.discharge_elbow_90_sr_box_value.setMaximumWidth(100)
-        discharge_elbow_90_sr_box_layout = QHBoxLayout()
-        discharge_elbow_90_sr_box_layout.addWidget(discharge_elbow_90_sr_box_label)
-        discharge_elbow_90_sr_box_layout.addWidget(self.discharge_elbow_90_sr_box_value)
+        # Loop que cria o layout da entrada do input da sucção
+        for label, value in zip(input_labels, input_values):
+            # Horizontal layout for each pair
+            h_layout = QHBoxLayout()
 
-        discharge_input_box_layout.addLayout(discharge_elbow_90_sr_box_layout)
+            # Create QLabel
+            label = QLabel(label)
 
-        ####
-        discharge_elbow_45_box_label = QLabel("Cotovelo 45°")
-        self.discharge_elbow_45_box_value = QSpinBox()
-        self.discharge_elbow_45_box_value.setMaximumWidth(100)
-        discharge_elbow_45_box_layout = QHBoxLayout()
-        discharge_elbow_45_box_layout.addWidget(discharge_elbow_45_box_label)
-        discharge_elbow_45_box_layout.addWidget(self.discharge_elbow_45_box_value)
+            # Create QSpinBox
+            spin_box = QDoubleSpinBox()
+            spin_box.setDecimals(0)
+            if label == "Trecho Retilineo":
+                spin_box.setDecimals(2)
+            spin_box.setValue(value)
+            # Adicionar uma referência ao spin_box
+            self.spin_boxes_discharge.append(spin_box)
 
-        discharge_input_box_layout.addLayout(discharge_elbow_45_box_layout)
+            # Adicionar os widgets no layout horizontal
+            h_layout.addWidget(label)
+            h_layout.addWidget(spin_box)
 
-        ####
-        discharge_curve_90_rl_box_label = QLabel("Curva 90° Raio Longo")
-        self.discharge_curve_90_rl_box_value = QSpinBox()
-        self.discharge_curve_90_rl_box_value.setMaximumWidth(100)
-        discharge_curve_90_rl_box_layout = QHBoxLayout()
-        discharge_curve_90_rl_box_layout.addWidget(discharge_curve_90_rl_box_label)
-        discharge_curve_90_rl_box_layout.addWidget(self.discharge_curve_90_rl_box_value)
-
-        discharge_input_box_layout.addLayout(discharge_curve_90_rl_box_layout)
-        
-        ####
-        discharge_curve_90_sr_box_label = QLabel("Curva 90° Raio Curto")
-        self.discharge_curve_90_sr_box_value = QSpinBox()
-        self.discharge_curve_90_sr_box_value.setMaximumWidth(100)
-        discharge_curve_90_sr_box_layout = QHBoxLayout()
-        discharge_curve_90_sr_box_layout.addWidget(discharge_curve_90_sr_box_label)
-        discharge_curve_90_sr_box_layout.addWidget(self.discharge_curve_90_sr_box_value)
-
-        discharge_input_box_layout.addLayout(discharge_curve_90_sr_box_layout)
+            discharge_input_box_layout.addLayout(h_layout)
 
 
         # Widget Central com a Imagem Explicatoria
@@ -261,10 +102,10 @@ class SystemInputWidget(QWidget):
         discharge_input_box.setLayout(discharge_input_box_layout)
 
         ##
-        sucction_input_box.setMaximumWidth(300)
-        sucction_input_box.setMinimumWidth(250)
-        discharge_input_box.setMaximumWidth(300)
-        discharge_input_box.setMinimumWidth(250)
+        sucction_input_box.setMaximumWidth(320)
+        sucction_input_box.setMinimumWidth(300)
+        discharge_input_box.setMaximumWidth(320)
+        discharge_input_box.setMinimumWidth(300)
 
         ## Set up main windows
         main_layout = QHBoxLayout()
@@ -280,3 +121,9 @@ class SystemInputWidget(QWidget):
 
     def get_input_data():
         None
+
+    def get_spinbox_values_sucction(self):
+        return [spin_box.value() for spin_box in self.spin_boxes_sucction]
+
+    def get_spinbox_values_discharge(self):
+        return [spin_box.value() for spin_box in self.spin_boxes_discharge]
