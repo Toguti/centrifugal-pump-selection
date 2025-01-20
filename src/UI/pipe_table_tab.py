@@ -65,8 +65,8 @@ class SystemInputWidget(QWidget):
             input_label.setMinimumWidth(100)
 
             # Criar o Spin box de Tamanho
-            input_size_spin_box = QSpinBox()
-            self.size_sucction.append(input_size_spin_box)
+            input_size_list = QSpinBox()
+            self.size_sucction.append(input_size_list)
 
             # Create QSpinBox
             input_spin_box = QDoubleSpinBox()
@@ -81,7 +81,7 @@ class SystemInputWidget(QWidget):
 
             # Adicionar os widgets no layout horizontal
             h_layout.addWidget(input_label)
-            h_layout.addWidget(input_size_spin_box)
+            h_layout.addWidget(input_size_list)
             h_layout.addWidget(input_spin_box)
 
             sucction_input_box_layout.addLayout(h_layout)
@@ -96,8 +96,26 @@ class SystemInputWidget(QWidget):
             input_label.setMinimumWidth(100)
 
             # Criar o Spin box de Tamanho
-            input_size_spin_box = QSpinBox()
-            self.size_discharge.append(input_size_spin_box)
+            input_size_list = QListWidget()
+            input_size_list.addItems([
+                "13 (1/2\")",
+                "19 (3/4\")",
+                "25 (1\")",
+                "32 (1.1/4\")",
+                "38 (1.1/2\")",
+                "50 (2\")",
+                "63 (2.1/2\")",
+                "75 (3\")",
+                "100 (4\")",
+                "125 (5\")",
+                "150 (6\")",
+                "200 (8\")",
+                "250 (10\")",
+                "300 (12\")",
+                "350 (14\")",
+                ])
+
+            self.size_discharge.append(input_size_list)
 
             # Create QSpinBox
             input_spin_box = QDoubleSpinBox()
@@ -112,7 +130,7 @@ class SystemInputWidget(QWidget):
 
             # Adicionar os widgets no layout horizontal
             h_layout.addWidget(input_label)
-            h_layout.addWidget(input_size_spin_box)
+            h_layout.addWidget(input_size_list)
             h_layout.addWidget(input_spin_box)
 
             discharge_input_box_layout.addLayout(h_layout)
