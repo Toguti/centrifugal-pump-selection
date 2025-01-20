@@ -1,7 +1,6 @@
 # pipe_table_widget.py
 
-from PyQt6.QtWidgets import QWidget, QGroupBox, QHBoxLayout, QVBoxLayout, QLabel, QDoubleSpinBox, QSpinBox
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QDoubleSpinBox, QSpinBox, QListWidget
 from PyQt6.QtGui import QPixmap
 
 from UI.data.input_variables import *
@@ -37,8 +36,24 @@ class SystemInputWidget(QWidget):
         # Criar o valor inicial de cada input para testes
         input_values = [0 for element in range(21)] # mesmo tamamho do input_labels
         
-        self.spin_boxes_sucction = []
-        self.spin_boxes_discharge = []
+        self.quantity_sucction = []
+        self.size_sucction = []
+        self.quantity_discharge = []
+        self.size_discharge = []
+
+        # Headers
+        input_header = QHBoxLayout()
+        input_header.addWidget(QLabel("Descrição"))
+        input_header.addWidget(QLabel("Bitola"))
+        input_header.addWidget(QLabel("Quantidade"))
+
+        sucction_input_box_layout.addLayout(input_header)
+
+        input_header2 = QHBoxLayout()
+        input_header2.addWidget(QLabel("Descrição"))
+        input_header2.addWidget(QLabel("Bitola"))
+        input_header2.addWidget(QLabel("Quantidade"))
+        discharge_input_box_layout.addLayout(input_header2)
 
         # Loop que cria o layout da entrada do input da sucção
         for label, value in zip(input_labels, input_values):
@@ -46,21 +61,28 @@ class SystemInputWidget(QWidget):
             h_layout = QHBoxLayout()
 
             # Create QLabel
-            label = QLabel(label)
+            input_label = QLabel(label)
+            input_label.setMinimumWidth(100)
+
+            # Criar o Spin box de Tamanho
+            input_size_spin_box = QSpinBox()
+            self.size_sucction.append(input_size_spin_box)
 
             # Create QSpinBox
-            spin_box = QDoubleSpinBox()
-            spin_box.setValue(value)
-            spin_box.setDecimals(0)
+            input_spin_box = QDoubleSpinBox()
+            input_spin_box.setValue(value)
+            input_spin_box.setDecimals(0)
             if label == "Trecho Retilineo":
-                spin_box.setDecimals(2)
+                input_spin_box.setDecimals(2)
+                input_spin_box.setSingleStep(0.1)
 
-            # Adicionar uma referência ao spin_box
-            self.spin_boxes_sucction.append(spin_box)
+            # Adicionar uma referência ao input_spin_box
+            self.quantity_sucction.append(input_spin_box)
 
             # Adicionar os widgets no layout horizontal
-            h_layout.addWidget(label)
-            h_layout.addWidget(spin_box)
+            h_layout.addWidget(input_label)
+            h_layout.addWidget(input_size_spin_box)
+            h_layout.addWidget(input_spin_box)
 
             sucction_input_box_layout.addLayout(h_layout)
 
@@ -70,24 +92,30 @@ class SystemInputWidget(QWidget):
             h_layout = QHBoxLayout()
 
             # Create QLabel
-            label = QLabel(label)
+            input_label = QLabel(label)
+            input_label.setMinimumWidth(100)
+
+            # Criar o Spin box de Tamanho
+            input_size_spin_box = QSpinBox()
+            self.size_discharge.append(input_size_spin_box)
 
             # Create QSpinBox
-            spin_box = QDoubleSpinBox()
-            spin_box.setDecimals(0)
+            input_spin_box = QDoubleSpinBox()
+            input_spin_box.setValue(value)
+            input_spin_box.setDecimals(0)
             if label == "Trecho Retilineo":
-                spin_box.setDecimals(2)
-            spin_box.setValue(value)
-            # Adicionar uma referência ao spin_box
-            self.spin_boxes_discharge.append(spin_box)
+                input_spin_box.setDecimals(2)
+                input_spin_box.setSingleStep(0.1)
+
+            # Adicionar uma referência ao input_spin_box
+            self.quantity_discharge.append(input_spin_box)
 
             # Adicionar os widgets no layout horizontal
-            h_layout.addWidget(label)
-            h_layout.addWidget(spin_box)
+            h_layout.addWidget(input_label)
+            h_layout.addWidget(input_size_spin_box)
+            h_layout.addWidget(input_spin_box)
 
             discharge_input_box_layout.addLayout(h_layout)
-
-
         # Widget Central com a Imagem Explicatoria
     
         diagram_image_label = QLabel()
@@ -123,7 +151,7 @@ class SystemInputWidget(QWidget):
         None
 
     def get_spinbox_values_sucction(self):
-        return [spin_box.value() for spin_box in self.spin_boxes_sucction]
+        return [[spin_box.value() for spin_box in self.size_sucction],[spin_box.value() for spin_box in self.quantity_sucction]]
 
     def get_spinbox_values_discharge(self):
-        return [spin_box.value() for spin_box in self.spin_boxes_discharge]
+        return [[spin_box.value() for spin_box in self.size_discharge],[spin_box.value() for spin_box in self.quantity_discharge]]

@@ -84,8 +84,11 @@ class MainWindow(QMainWindow):
     def calculate(self):
         # system_flow = float(self.single_path_system_input.get_flow_value())
         # pipe_table_data = self.pipe_table_widget.retriveData()
-        a = self.system_input_widget.get_spinbox_values_sucction
+        a = self.system_input_widget.get_spinbox_values_sucction()
+        b = self.system_input_widget.get_spinbox_values_discharge()
+
         print(a)
+        print(b)
         
 
 
