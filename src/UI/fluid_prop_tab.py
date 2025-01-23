@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QButtonGroup, QApplication, QFormLayout
 )
 from PyQt6.QtCore import Qt
+from pyfluids import Fluid, FluidsList
 
 class FluidPropInput(QWidget):
     def __init__(self):
