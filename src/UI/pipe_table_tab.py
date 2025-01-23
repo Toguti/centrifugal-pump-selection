@@ -34,7 +34,17 @@ class SystemInputWidget(QWidget):
         "Válvula de Retenção Leve", "Válvula de Retenção Pesado"] # Dados de Entrada
         
         # Criar o valor inicial de cada input para testes
-        input_values = [0 for element in range(21)] # mesmo tamamho do input_labels
+        input_values_suction = {"Trecho Retilineo":6, "Diferença de Altura": 2, "Cotovelo 90° Raio Longo":0, "Cotovelo 90° Raio Médio":0, "Cotovelo 90° Raio Curto":0,
+        "Cotovelo 45°":0, "Curva 90° Raio Longo":5, "Curva 90° Raio Curto":0, "Curva 45°":4, "Entrada Normal":0, "Entrada de Borda":1,
+        "Válvula Gaveta Aberta":3, "Válvula Globo Aberta":0, "Válvula Ângular Aberta":0, "Passagem Reta Tê":0,
+        "Derivação Tê":0, "Bifurcação Tê":0, "Válvula de Pé e Crivo":1, "Saída de Canalização":1,
+        "Válvula de Retenção Leve":0, "Válvula de Retenção Pesado":1} # mesmo tamamho do input_labels
+
+        input_values_discharge = {"Trecho Retilineo":50, "Diferença de Altura": 8, "Cotovelo 90° Raio Longo":0, "Cotovelo 90° Raio Médio":0, "Cotovelo 90° Raio Curto":0,
+        "Cotovelo 45°":0, "Curva 90° Raio Longo":5, "Curva 90° Raio Curto":0, "Curva 45°":4, "Entrada Normal":0, "Entrada de Borda":1,
+        "Válvula Gaveta Aberta":3, "Válvula Globo Aberta":0, "Válvula Ângular Aberta":0, "Passagem Reta Tê":0,
+        "Derivação Tê":0, "Bifurcação Tê":0, "Válvula de Pé e Crivo":1, "Saída de Canalização":1,
+        "Válvula de Retenção Leve":0, "Válvula de Retenção Pesado":1} # mesmo tamamho do input_labels
         
         self.quantity_suction = []
         self.quantity_discharge = []
@@ -105,8 +115,8 @@ class SystemInputWidget(QWidget):
         input_header2.addWidget(QLabel("Quantidade"))
         discharge_input_box_layout.addLayout(input_header2)
 
-        # Loop que cria o layout da entrada do input da sucção
-        for label, value in zip(input_labels, input_values):
+        # INPUT TAB
+        for label in input_labels:
             # Horizontal layout for each pair
             h_layout = QHBoxLayout()
 
@@ -117,7 +127,7 @@ class SystemInputWidget(QWidget):
 
             # Create QSpinBox
             input_spin_box = QDoubleSpinBox()
-            input_spin_box.setValue(value)
+            input_spin_box.setValue(input_values_suction[label])
             input_spin_box.setDecimals(0)
             if label == "Trecho Retilineo":
                 input_spin_box.setDecimals(2)
@@ -133,8 +143,8 @@ class SystemInputWidget(QWidget):
 
             suction_input_box_layout.addLayout(h_layout)
 
-        # Loop que cria o layout da entrada do input da sucção
-        for label, value in zip(input_labels, input_values):
+        # DISCHARGE TAB
+        for label in input_labels:
             # Horizontal layout for each pair
             h_layout = QHBoxLayout()
 
@@ -145,7 +155,7 @@ class SystemInputWidget(QWidget):
 
             # Create QSpinBox
             input_spin_box = QDoubleSpinBox()
-            input_spin_box.setValue(value)
+            input_spin_box.setValue(input_values_discharge[label])
             input_spin_box.setDecimals(0)
             if label == "Trecho Retilineo":
                 input_spin_box.setDecimals(2)
@@ -162,7 +172,7 @@ class SystemInputWidget(QWidget):
         # Widget Central com a Imagem Explicatoria
     
         diagram_image_label = QLabel()
-        diagram_image_pixmap = QPixmap('src\/UI\/img\/diagram-image.png')
+        diagram_image_pixmap = QPixmap('src/UI/img/diagram-image.png')
         diagram_image_label.setPixmap(diagram_image_pixmap)
         middle_box_layout = QHBoxLayout()
         middle_box_layout.addWidget(diagram_image_label)
@@ -196,5 +206,11 @@ class SystemInputWidget(QWidget):
     def get_spinbox_values_suction(self):
         return [spin_box.value() for spin_box in self.quantity_suction]
 
+    def get_size_suction(self):
+        return self.input_size_list_input.currentData()
+
     def get_spinbox_values_discharge(self):
         return [spin_box.value() for spin_box in self.quantity_discharge]
+
+    def get_size_discharge(self):
+        return self.input_size_list_discharge.currentData()
