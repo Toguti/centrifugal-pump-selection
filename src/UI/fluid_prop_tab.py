@@ -109,3 +109,8 @@ class FluidPropInput(QWidget):
         except ValueError:
             print("Erro!!!! Não foi encontrado um valor de Densidade para", self.fluid_combo.currentText(), "Insira um valor Manualmente")
     # (self.temperature_input.value() + 273.15)
+
+    def get_mu_input_value(self):
+        return self.mu_input.value()
+    def get_rho_input_value(self):
+        return self.rho_input.value()

@@ -206,11 +206,11 @@ class SystemInputWidget(QWidget):
     def get_spinbox_values_suction(self):
         return [spin_box.value() for spin_box in self.quantity_suction]
 
-    def get_size_suction(self):
-        return self.input_size_list_input.currentData()
+    def get_suction_size(self):
+        return self.input_size_list_suction.currentText()
 
     def get_spinbox_values_discharge(self):
         return [spin_box.value() for spin_box in self.quantity_discharge]
 
-    def get_size_discharge(self):
-        return self.input_size_list_discharge.currentData()
+    def get_discharge_size(self):
+        return self.input_size_list_discharge.currentText()

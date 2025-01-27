@@ -2,41 +2,28 @@ import pandas as pd
 
 dt_equiv_lenght = pd.read_csv("./src/db/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
 
-def get_singularity_value(size, element):
-    
-    return dt_equiv_lenght.loc[size,element]
+def get_size_singularities_loss_values(size):
+    return dt_equiv_lenght.iloc[size,1:].to_numpy()
 
-def sum_equivalent_length(data):
-    total = {}
-    for el in data:
-        if el[2] in total:
-            total[el[2]] += get_singularity_value(size_dict[el[2]],el[1])*el[3]
-        else:
-            total[el[2]] = get_singularity_value(size_dict[el[2]],el[1])*el[3]
-    return total
-
-
-
-
-options = ['ct_90_rl', 
-           'ct_90_rm', 
-           'ct_90_rc', 
-           'ct_45', 
-           'cur_90_1_1-2', 
-           'cur_90_1', 
-           'cur_45', 
-           'ent_norm', 
-           'ent_borda', 
-           'rg_ga_a', 
-           'rg_gb_a', 
-           'rg_an_a', 
-           'te_main', 
-           'te_deriv', 
-           'te_div', 
-           'val_pec', 
-           'sai_can', 
-           'valv_ret_leve', 
-           'valv_ret_pesado']
+# options = ['ct_90_rl', 
+#            'ct_90_rm', 
+#            'ct_90_rc', 
+#            'ct_45', 
+#            'cur_90_1_1-2', 
+#            'cur_90_1', 
+#            'cur_45', 
+#            'ent_norm', 
+#            'ent_borda', 
+#            'rg_ga_a', 
+#            'rg_gb_a', 
+#            'rg_an_a', 
+#            'te_main', 
+#            'te_deriv', 
+#            'te_div', 
+#            'val_pec', 
+#            'sai_can', 
+#            'valv_ret_leve', 
+#            'valv_ret_pesado']
 
 size_dict = {
     "13 (1/2\")": 13,
@@ -54,4 +41,21 @@ size_dict = {
     "250 (10\")": 250,
     "300 (12\")": 300,
     "350 (14\")": 350,
+}
+size_dict_internal_diameter_sch40 = {
+    "13 (1/2\")": 15.80,
+    "19 (3/4\")": 20.93,
+    "25 (1\")": 26.64,
+    "32 (1.1/4\")": 35.04,
+    "38 (1.1/2\")": 40.90,
+    "50 (2\")": 52.51,
+    "63 (2.1/2\")": 62.71,
+    "75 (3\")": 77.92,
+    "100 (4\")": 102.26,
+    "125 (5\")": 128.20,
+    "150 (6\")": 154.06,
+    "200 (8\")": 202.72,
+    "250 (10\")": 254.51,
+    "300 (12\")": 303.23,
+    "350 (14\")": 333.34,
 }

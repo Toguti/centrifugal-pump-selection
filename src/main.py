@@ -17,6 +17,7 @@ import sys
 from UI.system_calculator import InputTable
 from UI.fluid_prop_tab import FluidPropInput
 from UI.pipe_table_tab import *
+from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -52,8 +53,8 @@ class MainWindow(QMainWindow):
 
         ## Fluid properties tab configuration ##
 
-        fluid_prop_input_widget = FluidPropInput()
-        fluid_prop_tab_layout.addWidget(fluid_prop_input_widget)
+        self.fluid_prop_input_widget = FluidPropInput()
+        fluid_prop_tab_layout.addWidget(self.fluid_prop_input_widget)
 
         ## Sytem input tab configuration ##
     	
@@ -84,13 +85,14 @@ class MainWindow(QMainWindow):
     def calculate(self):
         # system_flow = float(self.single_path_system_input.get_flow_value())
         # pipe_table_data = self.pipe_table_widget.retriveData()
-        a = self.system_input_widget.get_spinbox_values_suction()
-        b = self.system_input_widget.get_spinbox_values_discharge()
 
-        print(a)
-        print(b)
-        
-
+        calculate_pipe_system_head_loss(self.system_input_widget.get_spinbox_values_suction(), 
+                                        self.system_input_widget.get_suction_size(), 
+                                        self.system_input_widget.get_spinbox_values_discharge(), 
+                                        self.system_input_widget.get_discharge_size(),
+                                        50, 
+                                        self.fluid_prop_input_widget.get_mu_input_value(), 
+                                        self.fluid_prop_input_widget.get_rho_input_value())
 
 
     def createMenuBar(self):
