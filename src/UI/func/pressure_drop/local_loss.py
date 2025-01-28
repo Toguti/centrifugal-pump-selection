@@ -1,9 +1,13 @@
 import pandas as pd
+import numpy as np
 
 dt_equiv_lenght = pd.read_csv("./src/db/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
 
 def get_size_singularities_loss_values(size):
-    return dt_equiv_lenght.iloc[size,1:].to_numpy()
+    print(dt_equiv_lenght)
+    print(type(dt_equiv_lenght.index[0]))
+    print(type(np.int64(size)))
+    return dt_equiv_lenght.loc[np.int64(size)].to_numpy()
 
 # options = ['ct_90_rl', 
 #            'ct_90_rm', 

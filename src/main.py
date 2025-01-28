@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         system_input_tab_layout.addWidget(system_buttons_widget)
 
         # Memory
-        self.user_circuit = [] 
+        # self.user_circuit = [] 
 
         # Set the central widget of the Window. Widget will expand
         # to take up all the space in the window by default.

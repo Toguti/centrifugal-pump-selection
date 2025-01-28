@@ -87,7 +87,7 @@ def pressure_loss_array(D, L, Q, mu, rho, g, h, K, roughness):
     K: Total loss coefficient for fittings and valves (dimensionless)
     roughness: Absolute roughness of the pipe (m)
     """
-
+    Q = Q/3600
     # Area of cross-section
     A = np.pi * (D/2)**2 
  
@@ -121,7 +121,7 @@ def pressure_loss_array(D, L, Q, mu, rho, g, h, K, roughness):
     # Total pressure loss
     h_total = (h_f + h_s + h_g)
  
-    return h_total  # in Pascals
+    return h_total/(rho*g)  # in Pascals
 
 
 
@@ -146,6 +146,8 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
     discharge_local_loss = discharge_array[2:]    # Pega os valores a partir do index 2 até o final
 
     # Calcular o comprimento total de perda de carga equivalente das perdas localizadas
+    print(get_size_value(suction_size))
+    print(get_size_value(discharge_size))
     suction_total_local_loss_length = np.sum(get_size_singularities_loss_values(get_size_value(suction_size)))
     discharge_total_local_loss_length = np.sum(get_size_singularities_loss_values(get_size_value(discharge_size)))
 
