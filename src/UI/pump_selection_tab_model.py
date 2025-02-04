@@ -2,10 +2,10 @@ import sys
 import sqlite3
 import json
 import numpy as np
-import pyqtgraph as pg
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QComboBox, QMessageBox)
 from PyQt6.QtCore import Qt
+from PyQt6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
 
 # Caminho do banco de dados
 db_path = "./src/db/pump_data.db"
@@ -14,7 +14,7 @@ class PumpSelectionWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gerenciador de Bombas")
-        self.setGeometry(100, 100, 1200, 700)
+        self.setGeometry(100, 100, 600, 400)
         
         # Layout principal
         layout = QVBoxLayout()
@@ -37,8 +37,10 @@ class PumpSelectionWidget(QWidget):
         show_curve_button = QPushButton("Exibir Curva")
         show_curve_button.clicked.connect(self.plot_curve)
         
-        # Gráfico PyQtGraph
-        self.plot_widget = pg.PlotWidget()
+        # Gráfico PyQt6 Charts
+        self.chart = QChart()
+        self.chart_view = QChartView(self.chart)
+        self.chart_view.setRenderHint(self.chart_view.renderHints())
         
         # Adicionar widgets ao layout
         layout.addWidget(QLabel("Modelo:"))
@@ -53,7 +55,7 @@ class PumpSelectionWidget(QWidget):
         layout.addWidget(QLabel("Selecionar Bomba:"))
         layout.addWidget(self.pump_selector)
         layout.addWidget(show_curve_button)
-        layout.addWidget(self.plot_widget)
+        layout.addWidget(self.chart_view)
         
         self.setLayout(layout)
     
@@ -121,11 +123,24 @@ class PumpSelectionWidget(QWidget):
             vazao = np.linspace(q_min, q_max, 100)
             altura = np.polyval(coef_head, vazao)
             
-            self.plot_widget.clear()
-            self.plot_widget.plot(vazao, altura, pen='b', name=f"Curva {modelo}")
-            self.plot_widget.setLabel('left', "Altura Manométrica (m)")
-            self.plot_widget.setLabel('bottom', "Vazão (m³/h)")
-            self.plot_widget.setTitle("Curva da Bomba")
+            self.chart.removeAllSeries()
+            series = QLineSeries()
+            for x, y in zip(vazao, altura):
+                series.append(float(x), float(y))
+            
+            self.chart.addSeries(series)
+            self.chart.createDefaultAxes()
+            self.chart.setTitle(f"Curva {modelo}")
+            
+            axis_x = QValueAxis()
+            axis_x.setTitleText("Vazão (m³/h)")
+            self.chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            series.attachAxis(axis_x)
+            
+            axis_y = QValueAxis()
+            axis_y.setTitleText("Altura Manométrica (m)")
+            self.chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+            series.attachAxis(axis_y)
         else:
             QMessageBox.warning(self, "Erro", "Dados da bomba não encontrados!")
 

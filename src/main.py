@@ -18,6 +18,7 @@ from UI.system_calculator import InputTable
 from UI.fluid_prop_tab import FluidPropInput
 from UI.pipe_table_tab import *
 from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
+from UI.pump_selection_tab import PumpSelectionWidget
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -70,6 +71,11 @@ class MainWindow(QMainWindow):
         system_buttons_layout = QHBoxLayout(system_buttons_widget)
         system_buttons_layout.addWidget(calculate_button)
         system_input_tab_layout.addWidget(system_buttons_widget)
+
+        # Pump selection tab
+        self.pump_selection_widget = PumpSelectionWidget()
+        pump_selection_tab_layout.addWidget(self.pump_selection_widget)
+
 
         # Memory
         # self.user_circuit = [] 
