@@ -120,7 +120,7 @@ class PumpSelectionWidget(QWidget):
         if result:
             q_min, q_max, coef_head = result
             coef_head = json.loads(coef_head)
-            vazao = np.linspace(q_min, q_max, 100)
+            vazao = np.linspace(q_min, q_max, 200)
             altura = np.polyval(coef_head, vazao)
             
             self.chart.removeAllSeries()
