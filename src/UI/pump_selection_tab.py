@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLineEd
                              QPushButton, QComboBox, QMessageBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
-from UI.func.pump_db import db_path
 
 db_path = "./src/db/pump_data.db"
 
