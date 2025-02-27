@@ -109,11 +109,11 @@ class PumpSelectionWidget(QWidget):
             self.curve_data = dialog.result
     
     def load_pumps(self):
-        """Carrega as bombas disponíveis no banco de dados."""
+        """Carrega as pump_data disponíveis no banco de dados."""
         self.pump_selector.clear()
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT modelo FROM bombas")
+            cursor.execute("SELECT modelo FROM pump_models")
             for bomba in cursor.fetchall():
                 self.pump_selector.addItem(bomba[0])
     
@@ -139,7 +139,7 @@ class PumpSelectionWidget(QWidget):
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO bombas (modelo, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power)
+                INSERT INTO pump_data (modelo, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (modelo, rotacao, q_min, q_max, self.curve_data, self.curve_data, self.curve_data, self.curve_data))
         
