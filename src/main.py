@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
     def calculate(self):
         # system_flow = float(self.single_path_system_input.get_flow_value())
         # pipe_table_data = self.pipe_table_widget.retriveData()
-
+        self.pump_selection_widget
         calculate_pipe_system_head_loss(self.system_input_widget.get_spinbox_values_suction(), 
                                         self.system_input_widget.get_suction_size(), 
                                         self.system_input_widget.get_spinbox_values_discharge(), 

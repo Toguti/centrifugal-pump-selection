@@ -1,157 +1,198 @@
 import sys
-import sqlite3
-import json
 import numpy as np
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, 
-    QPushButton, QComboBox, QMessageBox, QDialog, QFormLayout
+    QApplication,
+    QDialog,
+    QTableWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QWidget,
+    QFormLayout,
+    QPushButton,
+    QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
+from PyQt6.QtGui import QDoubleValidator, QIntValidator
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
-# Caminho do banco de dados
-db_path = "./src/db/pump_data.db"
+class FloatDelegate(QStyledItemDelegate):
+    """Delegate para restringir a edição da célula a valores float."""
+    def createEditor(self, parent, option, index):
+        editor = QLineEdit(parent)
+        editor.setValidator(QDoubleValidator(editor))
+        return editor
 
 class CurveInputDialog(QDialog):
     """Janela para entrada de pontos da curva da bomba."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Adicionar Curva da Bomba")
-        self.setGeometry(200, 200, 300, 200)
+        self.setGeometry(500, 500, 1200, 800)
         
-        self.layout = QFormLayout()
-        self.vazao_inputs = [QLineEdit() for _ in range(4)]
-        self.head_inputs = [QLineEdit() for _ in range(4)]
+        # Layout vertical principal
+        vertical_layout = QVBoxLayout(self)
         
-        for i in range(4):
-            self.layout.addRow(f"Vazão {i+1} (m³/h):", self.vazao_inputs[i])
-            self.layout.addRow(f"Head {i+1} (m):", self.head_inputs[i])
+        # Label de instrução acima da área de dados
+        instruction_label = QLabel("Preencha a tabela com os pontos da curva característica da bomba.", self)
+        vertical_layout.addWidget(instruction_label)
         
-        self.confirm_button = QPushButton("Gerar Curva")
-        self.confirm_button.clicked.connect(self.generate_curve)
-        self.layout.addWidget(self.confirm_button)
+        # Layout horizontal para agrupar o formulário e a tabela
+        horizontal_layout = QHBoxLayout()
+        vertical_layout.addLayout(horizontal_layout)
         
-        self.setLayout(self.layout)
-    
-    def generate_curve(self):
-        try:
-            vazoes = [float(input.text()) for input in self.vazao_inputs]
-            heads = [float(input.text()) for input in self.head_inputs]
-            self.result = json.dumps(np.polyfit(vazoes, heads, 5).tolist())
-            self.accept()
-        except ValueError:
-            QMessageBox.warning(self, "Erro", "Preencha todos os campos corretamente com valores numéricos!")
+        # Widget de formulário para os dados da bomba (lado esquerdo)
+        pump_info_widget = QWidget(self)
+        pump_info_layout = QFormLayout(pump_info_widget)
+        
+        # Linha de entrada para "Marca"
+        self.line_edit_marca = QLineEdit(pump_info_widget)
+        pump_info_layout.addRow("Marca:", self.line_edit_marca)
+        
+        # Linha de entrada para "Modelo"
+        self.line_edit_modelo = QLineEdit(pump_info_widget)
+        pump_info_layout.addRow("Modelo:", self.line_edit_modelo)
+        
+        # Linha de entrada para "Diâmetro" com validação para inteiro
+        self.line_edit_diametro = QLineEdit(pump_info_widget)
+        self.line_edit_diametro.setValidator(QIntValidator(0, 1000000, self))
+        pump_info_layout.addRow("Diâmetro:", self.line_edit_diametro)
+        
+        # Linha de entrada para "Rotação" com validação para inteiro
+        self.line_edit_rotacao = QLineEdit(pump_info_widget)
+        self.line_edit_rotacao.setValidator(QIntValidator(0, 1000000, self))
+        pump_info_layout.addRow("Rotação:", self.line_edit_rotacao)
+        
+        # Botão "Adicionar Bomba" logo após o campo de rotação
+        self.btn_adicionar_bomba = QPushButton("Adicionar Bomba", pump_info_widget)
+        pump_info_layout.addRow(self.btn_adicionar_bomba)
+        self.btn_adicionar_bomba.clicked.connect(self.adicionar_bomba)
+        
+        # Adiciona o formulário (lado esquerdo) no layout horizontal
+        horizontal_layout.addWidget(pump_info_widget)
+        
+        # Cria a tabela removendo as colunas "Marca", "Modelo", "Diâmetro" e "Rotação"
+        # A tabela terá 6 linhas e 5 colunas
+        self.table_widget = QTableWidget(6, 5, self)
+        headers = ["Vazão", "Head", "Eficiência", "NPSHr", "Potência"]
+        self.table_widget.setHorizontalHeaderLabels(headers)
+        
+        # Define um delegate para garantir que os dados inseridos sejam float
+        self.table_widget.setItemDelegate(FloatDelegate(self.table_widget))
+        
+        # Adiciona a tabela (lado direito) no layout horizontal
+        horizontal_layout.addWidget(self.table_widget)
+        
+        # Define a proporção de espaço: esquerda (formulário) 30% e direita (tabela) 70%
+        horizontal_layout.setStretch(0, 3)
+        horizontal_layout.setStretch(1, 7)
+        
+    def adicionar_bomba(self):
+        print("Bomba adicionada com sucesso!")
 
 class PumpSelectionWidget(QWidget):
     """Janela principal para gerenciar bombas e exibir curvas."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gerenciador de Bombas")
-        self.setGeometry(100, 100, 600, 400)
-        self.curve_data = None
-        
         self.init_ui()
     
     def init_ui(self):
         """Inicializa a interface gráfica."""
-        layout = QVBoxLayout()
+        self.setWindowTitle("Seleção de Bombas")
+        self.resize(800, 600)
         
-        self.model_input = QLineEdit()
-        self.rpm_input = QLineEdit()
-        self.q_min_input = QLineEdit()
-        self.q_max_input = QLineEdit()
+        # Layout horizontal principal para separar as áreas esquerda e direita
+        main_layout = QHBoxLayout(self)
         
-        self.add_curve_button = QPushButton("Adicionar Curva da Bomba")
-        self.add_curve_button.clicked.connect(self.open_curve_input)
+        # ---------------------------
+        # Área Esquerda (Inputs e Botões)
+        # ---------------------------
+        left_widget = QWidget(self)
+        left_layout = QVBoxLayout(left_widget)
         
-        self.add_pump_button = QPushButton("Adicionar Bomba")
-        self.add_pump_button.clicked.connect(self.add_pump)
+        # Widget de Vazão (QLabel + QLineEdit com sufixo 'm³/h')
+        vazao_widget = QWidget(left_widget)
+        vazao_layout = QHBoxLayout(vazao_widget)
+        vazao_layout.setContentsMargins(0, 0, 0, 0)  # Remover margens para "colar" os widgets
+        label_vazao = QLabel("Vazão:", vazao_widget)
+        vazao_layout.addWidget(label_vazao)
+        self.line_edit_vazao = QLineEdit(vazao_widget)
+        self.line_edit_vazao.setValidator(QDoubleValidator(0.0, 1e9, 2, self))
+        self.line_edit_vazao.setPlaceholderText("Valor em m³/h")
+        vazao_layout.addWidget(self.line_edit_vazao)
         
-        self.pump_selector = QComboBox()
-        self.load_pumps()
+        # Adiciona o widget de vazão no topo do left_layout
+        left_layout.addWidget(vazao_widget)
         
-        self.show_curve_button = QPushButton("Exibir Curva")
-        self.show_curve_button.clicked.connect(self.plot_curve)
+        # Adiciona um espaçador para empurrar os botões para a parte inferior
+        left_layout.addStretch()
         
-        self.chart = QChart()
-        self.chart_view = QChartView(self.chart)
-        self.chart_view.setRenderHint(self.chart_view.renderHints())
+        # Botão para abrir a janela de Curva da Bomba (texto alterado)
+        self.btn_adicionar_curva = QPushButton("Adicionar nova curva de bomba", left_widget)
+        self.btn_adicionar_curva.clicked.connect(self.abrir_curve_input_dialog)
+        left_layout.addWidget(self.btn_adicionar_curva)
         
-        self.axis_x = QValueAxis()
-        self.axis_x.setTitleText("Vazão (m³/h)")
-        self.axis_y = QValueAxis()
-        self.axis_y.setTitleText("Altura Manométrica (m)")
+        # Botão "Calcular" abaixo do botão anterior
+        self.btn_calcular = QPushButton("Calcular", left_widget)
+        self.btn_calcular.clicked.connect(self.calcular_sistema)
+        left_layout.addWidget(self.btn_calcular)
         
-        self.chart.addAxis(self.axis_x, Qt.AlignmentFlag.AlignBottom)
-        self.chart.addAxis(self.axis_y, Qt.AlignmentFlag.AlignLeft)
+        # ---------------------------
+        # Área Direita (Exibição do Gráfico)
+        # ---------------------------
+        right_widget = QWidget(self)
+        right_layout = QVBoxLayout(right_widget)
         
-        layout.addWidget(QLabel("Modelo:"))
-        layout.addWidget(self.model_input)
-        layout.addWidget(QLabel("Rotação (RPM):"))
-        layout.addWidget(self.rpm_input)
-        layout.addWidget(QLabel("Vazão Mínima (m³/h):"))
-        layout.addWidget(self.q_min_input)
-        layout.addWidget(QLabel("Vazão Máxima (m³/h):"))
-        layout.addWidget(self.q_max_input)
-        layout.addWidget(self.add_curve_button)
-        layout.addWidget(self.add_pump_button)
-        layout.addWidget(QLabel("Selecionar Bomba:"))
-        layout.addWidget(self.pump_selector)
-        layout.addWidget(self.show_curve_button)
-        layout.addWidget(self.chart_view)
+        # Criação do canvas para exibição do gráfico usando matplotlib
+        self.figure = Figure(figsize=(5, 4))
+        self.canvas = FigureCanvas(self.figure)
+        # Cria um eixo para o gráfico
+        self.ax = self.figure.add_subplot(111)
+        # Plot inicial em branco
+        self.ax.set_xlabel("Flow (m³/h)")
+        self.ax.set_ylabel("Head")
+        self.ax.set_title("Pump Characteristic Curve")
+        self.canvas.draw()
+        right_layout.addWidget(self.canvas)
         
-        self.setLayout(layout)
+        # Adiciona os widgets esquerdo e direito ao layout principal com proporções 30% e 70%
+        main_layout.addWidget(left_widget, 3)
+        main_layout.addWidget(right_widget, 7)
     
-    def open_curve_input(self):
-        """Abre a janela de entrada de curva da bomba."""
+    def abrir_curve_input_dialog(self):
+        """Instancia e abre a janela de entrada da curva da bomba."""
         dialog = CurveInputDialog(self)
-        if dialog.exec():
-            self.curve_data = dialog.result
+        dialog.exec()
     
-    def load_pumps(self):
-        """Carrega as pump_data disponíveis no banco de dados."""
-        self.pump_selector.clear()
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT modelo FROM pump_models")
-            for bomba in cursor.fetchall():
-                self.pump_selector.addItem(bomba[0])
+    def calcular_sistema(self):
+        """Função executada ao clicar no botão 'Calcular'."""
+        # Chama a função que simula o cálculo do sistema e retorna os pontos do gráfico
+        flow, head = self.calculate_pipe_system_head_loss()
+        
+        # Atualiza o gráfico com os pontos retornados
+        self.ax.clear()
+        self.ax.plot(flow, head, marker='o', linestyle='-')
+        self.ax.set_xlabel("Flow (m³/h)")
+        self.ax.set_ylabel("Head")
+        self.ax.set_title("Pump Characteristic Curve")
+        self.canvas.draw()
+        
+        print("O Cálculo do sistema foi feito!")
     
-    def add_pump(self):
-        """Adiciona uma nova bomba ao banco de dados."""
-        modelo = self.model_input.text()
-        rotacao = self.rpm_input.text()
-        q_min = self.q_min_input.text()
-        q_max = self.q_max_input.text()
-        
-        if not (modelo and rotacao and q_min and q_max and self.curve_data):
-            QMessageBox.warning(self, "Erro", "Preencha todos os campos corretamente e adicione uma curva!")
-            return
-        
-        try:
-            rotacao = int(rotacao)
-            q_min = float(q_min)
-            q_max = float(q_max)
-        except ValueError:
-            QMessageBox.warning(self, "Erro", "Os valores de rotação e vazão devem ser numéricos!")
-            return
-        
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO pump_data (modelo, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (modelo, rotacao, q_min, q_max, self.curve_data, self.curve_data, self.curve_data, self.curve_data))
-        
-        QMessageBox.information(self, "Sucesso", "Bomba adicionada com sucesso!")
-        self.load_pumps()
-    
-    def plot_curve(self):
-        """Exibe a curva da bomba selecionada."""
-        QMessageBox.information(self, "Info", "Funcionalidade de exibir curva ainda não implementada.")
+    def calculate_pipe_system_head_loss(self):
+        """
+        Função que simula o cálculo da perda de carga no sistema,
+        retornando arrays de 'flow' e 'head' para o gráfico.
+        """
+        # Exemplo: gera 20 pontos de fluxo entre 0 e 100 m³/h
+        flow = np.linspace(0, 100, 20)
+        # Exemplo: Head decresce linearmente em função do fluxo
+        head = 100 - 0.5 * flow
+        return flow, head
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = PumpSelectionWidget()
-    window.show()
+    main_widget = PumpSelectionWidget()
+    main_widget.show()
     sys.exit(app.exec())

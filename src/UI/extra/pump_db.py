@@ -23,7 +23,8 @@ cursor.execute("""
         coef_head TEXT NOT NULL,
         coef_eff TEXT NOT NULL,
         coef_npshr TEXT NOT NULL,
-        coef_power TEXT NOT NULL
+        coef_power TEXT NOT NULL,
+        UNIQUE(marca, modelo, diametro, rotacao)
     )
 """)
 
@@ -32,18 +33,38 @@ cursor.execute("""
 
 # Função para adicionar uma bomba ao banco de dados
 def adicionar_bomba(marca, modelo, diametro, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power):
-    
-    coef_head = json.dumps(coef_head)
-    coef_eff = json.dumps(coef_eff)
-    coef_npshr = json.dumps(coef_npshr)
-    coef_power = json.dumps(coef_power)
+    """
+    Insere uma bomba no banco de dados apenas se não existir uma com os mesmos identificadores:
+    marca, modelo, diâmetro e rotação.
 
+    Caso já exista, a função apenas retorna sem inserir.
+    """
+    # Verifica se já existe um registro com os mesmos identificadores
+    cursor.execute("""
+        SELECT 1 FROM pump_models
+        WHERE marca = ? AND modelo = ? AND diametro = ? AND rotacao = ?
+    """, (marca, modelo, diametro, rotacao))
+    
+    if cursor.fetchone() is not None:
+        # Registro já existe, então não insere e pode exibir uma mensagem de log, se desejado
+        print("Registro já existe. Inserção cancelada.")
+        return
+
+    # Converte os coeficientes para o formato JSON
+    coef_head_json = json.dumps(coef_head)
+    coef_eff_json = json.dumps(coef_eff)
+    coef_npshr_json = json.dumps(coef_npshr)
+    coef_power_json = json.dumps(coef_power)
+
+    # Insere o novo registro no banco de dados
     cursor.execute("""
         INSERT INTO pump_models (marca, modelo, diametro, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (marca, modelo, diametro, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power))
+    """, (marca, modelo, diametro, rotacao, vazao_min, vazao_max,
+          coef_head_json, coef_eff_json, coef_npshr_json, coef_power_json))
     
     conn.commit()
+    print("Registro inserido com sucesso!")
 
 # Adicionar pump_models fictícias se a tabela estiver vazia
 cursor.execute("SELECT COUNT(*) FROM pump_models")
