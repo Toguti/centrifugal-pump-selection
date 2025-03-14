@@ -65,6 +65,7 @@ def parse_pump_data(file_path):
     
     return pump_data
 
+
 def fit_polynomial(pump_data, degree=POLY_DEGREE):
     """
     Ajusta um polinômio aos dados de cada curva e retorna os coeficientes.
@@ -112,6 +113,7 @@ def fit_polynomial(pump_data, degree=POLY_DEGREE):
     
     return poly_fits
 
+
 def plot_all_curves(pump_data, poly_fits):
     """
     Plota e exibe os gráficos das curvas originais e dos ajustes polinomiais.
@@ -140,6 +142,7 @@ def plot_all_curves(pump_data, poly_fits):
             plt.legend()
             plt.grid()
             plt.show()
+
 
 def save_plots_to_pdf(pump_data_list, poly_fits_list, output_pdf):
     """
@@ -176,6 +179,7 @@ def save_plots_to_pdf(pump_data_list, poly_fits_list, output_pdf):
     
     print(f"Gráficos salvos em {output_pdf}")
 
+
 def process_file(file_name, raw_data_path, output_path, degree=POLY_DEGREE):
     """
     Processa um único arquivo:
@@ -184,11 +188,6 @@ def process_file(file_name, raw_data_path, output_path, degree=POLY_DEGREE):
       - Extrai os metadados do nome do arquivo (Marca, Modelo e Rotation).
       - Agrupa os coeficientes das 4 curvas em uma única linha, criando as colunas:
         "flowxhead", "flowxeff", "flowxnpsh" e "flowxpower".
-      - A partir da curva "effxflow", calcula:
-          * eff_bop: máxima eficiência.
-          * eff_bop_flow: fluxo correspondente a eff_bop.
-          * 80_eff_bop_flow = 0.8 * eff_bop_flow, limitado pelo min_flow.
-          * 110_eff_bop_flow = 1.1 * eff_bop_flow, limitado pelo max_flow.
       - Exporta as informações em um arquivo CSV.
     
     Parâmetros:
@@ -230,48 +229,6 @@ def process_file(file_name, raw_data_path, output_path, degree=POLY_DEGREE):
         else:
             flow_range[diameter] = (None, None)
     
-    # Para cada diâmetro, calcular os novos parâmetros a partir da curva "effxflow"
-    # - eff_bop: valor máximo de eficiência.
-    # - eff_bop_flow: fluxo correspondente a eff_bop.
-    # - 80_eff_bop_flow = 0.8 * eff_bop_flow, mas se for menor que min_flow, utiliza min_flow.
-    # - 110_eff_bop_flow = 1.1 * eff_bop_flow, mas se for maior que max_flow, utiliza max_flow.
-    additional_data = {}
-    for diameter, curves in pump_data.items():
-        if diameter == "all":
-            continue
-        eff_bop = ""
-        eff_bop_flow = ""
-        eff80_flow = ""
-        eff110_flow = ""
-        
-        if "effxflow" in curves:
-            x_eff = np.array(curves["effxflow"]['X'])
-            y_eff = np.array(curves["effxflow"]['Y'])
-            # Filtrar pontos dentro do intervalo [min_flow, max_flow]
-            min_flow, max_flow = flow_range.get(diameter, (None, None))
-            if min_flow is not None and max_flow is not None:
-                mask = (x_eff >= min_flow) & (x_eff <= max_flow)
-                if np.any(mask):
-                    x_filtered = x_eff[mask]
-                    y_filtered = y_eff[mask]
-                else:
-                    x_filtered = x_eff
-                    y_filtered = y_eff
-            else:
-                x_filtered = x_eff
-                y_filtered = y_eff
-            if len(y_filtered) > 0:
-                idx_max = np.argmax(y_filtered)
-                eff_bop = y_filtered[idx_max]
-                eff_bop_flow = x_filtered[idx_max]
-                # Calcula os novos fluxos em relação a eff_bop_flow
-                target80 = 0.8 * eff_bop_flow
-                target110 = 1.1 * eff_bop_flow
-                # Limita target80 ao mínimo e target110 ao máximo
-                eff80_flow = target80 if target80 >= min_flow else min_flow
-                eff110_flow = target110 if target110 <= max_flow else max_flow
-        additional_data[diameter] = (eff_bop, eff_bop_flow, eff80_flow, eff110_flow)
-    
     # Agrupar os coeficientes para cada diâmetro em uma única linha,
     # distribuindo-os nas colunas "flowxhead", "flowxeff", "flowxnpsh" e "flowxpower".
     rows = []
@@ -282,18 +239,13 @@ def process_file(file_name, raw_data_path, output_path, degree=POLY_DEGREE):
         flowxeff  = curves_poly.get("effxflow", "")
         flowxnpsh = curves_poly.get("npshxflow", "")
         flowxpower = curves_poly.get("powerxflow", "")
-        # Obter os novos parâmetros calculados para a curva effxflow
-        eff_bop, eff_bop_flow, eff80_flow, eff110_flow = additional_data.get(diameter, ("", "", "", ""))
-        # Nova ordem: Marca, Modelo, Diameter, Rotation, min_flow, max_flow,
-        # flowxhead, flowxeff, flowxnpsh, flowxpower, eff_bop, eff_bop_flow, 80_eff_bop_flow, 110_eff_bop_flow
-        row = (marca, modelo, diameter, rotation, min_flow, max_flow, flowxhead, flowxeff, flowxnpsh, flowxpower,
-               eff_bop, eff_bop_flow, eff80_flow, eff110_flow)
+        # Nova ordem: Marca, Modelo, Diameter, Rotation, min_flow, max_flow, flowxhead, flowxeff, flowxnpsh, flowxpower
+        row = (marca, modelo, diameter, rotation, min_flow, max_flow, flowxhead, flowxeff, flowxnpsh, flowxpower)
         rows.append(row)
     
     # Definindo o cabeçalho desejado com as colunas na nova ordem
     columns = ["Marca", "Modelo", "Diameter", "Rotation", "min_flow", "max_flow",
-               "flowxhead", "flowxeff", "flowxnpsh", "flowxpower",
-               "eff_bop", "eff_bop_flow", "p80_eff_bop_flow", "p110_eff_bop_flow"]
+               "flowxhead", "flowxeff", "flowxnpsh", "flowxpower"]
     
     poly_df = pd.DataFrame(rows, columns=columns)
     
@@ -304,6 +256,7 @@ def process_file(file_name, raw_data_path, output_path, degree=POLY_DEGREE):
         print(f"Erro ao salvar CSV {output_file}: {e}")
     
     return pump_data, poly_fits
+
 
 if __name__ == "__main__":
     raw_data_path = "src/db/pumps/raw_data"

@@ -1,5 +1,4 @@
-from PyQt6.QtCore import (QSize, 
-                          )
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -10,15 +9,14 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
 )
-from PyQt6.QtGui import (
-    QAction
-)
+from PyQt6.QtGui import QAction
 import sys
 from UI.system_calculator import InputTable
 from UI.fluid_prop_tab import FluidPropInput
 from UI.pipe_table_tab import *
 from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 from UI.pump_selection_tab import PumpSelectionWidget
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -28,83 +26,60 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(QSize(1200, 768))
   
         # Widgets
-        # Center
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        #Layout for the central widget
         central_layout = QVBoxLayout(central_widget)
 
-        # Tabs in Central Widget
+        # Tabs em Central Widget
         tab_widget = QTabWidget()
 
-        # Create Tabs 
+        # Criação das abas
         fluid_prop_tab = QWidget()
         system_input_tab = QWidget()
         pump_selection_tab = QWidget()
 
-        # Add tabs to QTabWidget
+        # Adiciona abas ao QTabWidget
         tab_widget.addTab(fluid_prop_tab, "Propriedade do Fluido")
         tab_widget.addTab(system_input_tab, "Sistema")
         tab_widget.addTab(pump_selection_tab, "Seleção da Bomba")
 
-        # Set tabs Layouts
+        # Layouts para cada aba
         fluid_prop_tab_layout = QVBoxLayout(fluid_prop_tab)
         system_input_tab_layout = QVBoxLayout(system_input_tab)
         pump_selection_tab_layout = QVBoxLayout(pump_selection_tab)
 
-        ## Fluid properties tab configuration ##
-
+        ## Configuração da aba "Propriedade do Fluido"
         self.fluid_prop_input_widget = FluidPropInput()
         fluid_prop_tab_layout.addWidget(self.fluid_prop_input_widget)
 
-        ## Sytem input tab configuration ##
-    	
+        ## Configuração da aba "Sistema"
         self.system_input_widget = SystemInputWidget()
         system_input_tab_layout.addWidget(self.system_input_widget)
 
-        # System Input Buttons ##
+        # (Opcional) Remova ou comente o botão "Calcular" aqui, pois será usado na aba "Seleção da Bomba"
+        # calculate_button = QPushButton("Calcular")
+        # calculate_button.clicked.connect(self.calculate)
+        # system_buttons_widget = QWidget()
+        # system_buttons_layout = QHBoxLayout(system_buttons_widget)
+        # system_buttons_layout.addWidget(calculate_button)
+        # system_input_tab_layout.addWidget(system_buttons_widget)
 
-        calculate_button = QPushButton("Calcular")
-        calculate_button.clicked.connect(self.calculate)
-
-        system_buttons_widget = QWidget()
-        system_buttons_layout = QHBoxLayout(system_buttons_widget)
-        system_buttons_layout.addWidget(calculate_button)
-        system_input_tab_layout.addWidget(system_buttons_widget)
-
-        # Pump selection tab
-        self.pump_selection_widget = PumpSelectionWidget()
+        ## Configuração da aba "Seleção da Bomba"
+        # Injeção dos widgets de entrada para utilização interna no PumpSelectionWidget
+        self.pump_selection_widget = PumpSelectionWidget(
+            system_input_widget=self.system_input_widget,
+            fluid_prop_input_widget=self.fluid_prop_input_widget
+        )
         pump_selection_tab_layout.addWidget(self.pump_selection_widget)
 
-
-        # Memory
-        # self.user_circuit = [] 
-
-        # Set the central widget of the Window. Widget will expand
-        # to take up all the space in the window by default.
         central_layout.addWidget(tab_widget)
         
-        ## Create the menu bar
         self.createMenuBar()
-
-
-    def calculate(self):
-        # system_flow = float(self.single_path_system_input.get_flow_value())
-        # pipe_table_data = self.pipe_table_widget.retriveData()
-        self.pump_selection_widget
-        calculate_pipe_system_head_loss(self.system_input_widget.get_spinbox_values_suction(), 
-                                        self.system_input_widget.get_suction_size(), 
-                                        self.system_input_widget.get_spinbox_values_discharge(), 
-                                        self.system_input_widget.get_discharge_size(),
-                                        50, 
-                                        self.fluid_prop_input_widget.get_mu_input_value(), 
-                                        self.fluid_prop_input_widget.get_rho_input_value())
-
 
     def createMenuBar(self):
         menu_bar = self.menuBar()
 
-        # File menu
+        # Menu File
         file_menu = menu_bar.addMenu("File")
         open_action = QAction("Open", self)
         save_action = QAction("Save", self)
@@ -114,12 +89,12 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_action)
         file_menu.addAction(exit_action)
 
-        # Options menu
+        # Menu Options
         options_menu = menu_bar.addMenu("Options")
         settings_action = QAction("Settings", self)
         options_menu.addAction(settings_action)
 
-        # About menu
+        # Menu About
         about_menu = menu_bar.addMenu("About")
         about_action = QAction("About", self)
         about_action.triggered.connect(self.showAboutDialog)
@@ -127,7 +102,6 @@ class MainWindow(QMainWindow):
 
     def showAboutDialog(self):
         QMessageBox.about(self, "About", "This is a PyQt6 application demonstrating a rotated table.")
-
 
 
 if __name__ == '__main__':
