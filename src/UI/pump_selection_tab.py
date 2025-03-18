@@ -1,5 +1,3 @@
-# pump_selection_tab.py
-
 import sys
 import os
 import sqlite3
@@ -19,23 +17,23 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStyledItemDelegate,
     QGroupBox,
-    QComboBox,
     QListWidget,
     QMessageBox,
-    QListWidgetItem
+    QListWidgetItem,
+    QComboBox
 )
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+from typing import List, Union, Dict, Any
+import logging
 
 # Importa a função de cálculo da curva do sistema
 from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 # Importa a função de seleção automática de bomba
 from UI.func.auto_pump_selection import auto_pump_selection
-
-# Caminho do banco de dados
-DB_PATH = "./src/db/pump_data.db"
+# Importa as funções auxiliares para perdas locais
+from UI.extra.local_loss import size_dict_internal_diameter_sch40, size_dict, get_size_singularities_loss_values
 
 class FloatDelegate(QStyledItemDelegate):
     """Delegate para restringir a edição da célula a valores float."""
@@ -91,14 +89,12 @@ class CurveInputDialog(QDialog):
 class PumpSelectionWidget(QWidget):
     """
     Janela principal para gerenciar bombas e exibir curvas.
-    Todas as funcionalidades de seleção de bomba (por filtros e por lista)
-    foram integradas nesta classe.
+    Neste código, o valor de "Vazão (m³/h)" é utilizado como target_flow.
     """
     def __init__(self, system_input_widget, fluid_prop_input_widget, parent=None):
         super().__init__(parent)
         self.system_input_widget = system_input_widget
         self.fluid_prop_input_widget = fluid_prop_input_widget
-        # Para a seleção automática, esses atributos serão definidos após o cálculo do sistema
         self.system_curve = None
         self.target_flow = None
         self.init_ui()
@@ -109,26 +105,55 @@ class PumpSelectionWidget(QWidget):
         self.resize(800, 600)
         main_layout = QHBoxLayout(self)
         
-        # Área Esquerda: inputs, seleção de bomba e botões
+        # Área Esquerda: inputs, resultados e botões
         left_widget = QWidget(self)
         left_layout = QVBoxLayout(left_widget)
         
-        # Widget de Vazão
+        # -- Campo de Vazão (que também será o target_flow) --
         vazao_widget = QWidget(left_widget)
         vazao_layout = QHBoxLayout(vazao_widget)
         vazao_layout.setContentsMargins(0, 0, 0, 0)
-        label_vazao = QLabel("Vazão:", vazao_widget)
+        label_vazao = QLabel("Vazão (m³/h):", vazao_widget)
         vazao_layout.addWidget(label_vazao)
         self.line_edit_vazao = QLineEdit(vazao_widget)
         self.line_edit_vazao.setValidator(QDoubleValidator(0.0, 1e9, 2, self))
-        self.line_edit_vazao.setPlaceholderText("Valor em m³/h")
+        self.line_edit_vazao.setPlaceholderText("Informe a vazão")
         vazao_layout.addWidget(self.line_edit_vazao)
         left_layout.addWidget(vazao_widget)
         
-        # QGroupBox: Seleção de Bomba (Lista)
+        # -- Dropdown para Diâmetro (Bitola) --
+        diametro_dropdown_widget = QWidget(left_widget)
+        diametro_dropdown_layout = QHBoxLayout(diametro_dropdown_widget)
+        diametro_dropdown_layout.setContentsMargins(0, 0, 0, 0)
+        label_diametro = QLabel("Diâmetro:", diametro_dropdown_widget)
+        diametro_dropdown_layout.addWidget(label_diametro)
+        self.combo_diametro_pipe = QComboBox(diametro_dropdown_widget)
+        # Preenche o dropdown com as chaves do dict size_dict_internal_diameter_sch40
+        self.combo_diametro_pipe.addItems(list(size_dict_internal_diameter_sch40.keys()))
+        diametro_dropdown_layout.addWidget(self.combo_diametro_pipe)
+        left_layout.addWidget(diametro_dropdown_widget)
+        
+        # Conecta o sinal do dropdown para atualizar a velocidade
+        self.combo_diametro_pipe.currentIndexChanged.connect(self.atualizar_velocidade)
+        
+        # -- Campo de Velocidade do Fluido (display somente leitura) --
+        velocity_widget = QWidget(left_widget)
+        velocity_layout = QHBoxLayout(velocity_widget)
+        velocity_layout.setContentsMargins(0, 0, 0, 0)
+        label_velocity = QLabel("Velocidade (m/s):", velocity_widget)
+        velocity_layout.addWidget(label_velocity)
+        self.line_edit_velocity = QLineEdit(velocity_widget)
+        self.line_edit_velocity.setReadOnly(True)
+        self.line_edit_velocity.setPlaceholderText("Será calculada automaticamente")
+        velocity_layout.addWidget(self.line_edit_velocity)
+        left_layout.addWidget(velocity_widget)
+        
+        # Conecta alteração da vazão para atualizar a velocidade
+        self.line_edit_vazao.textChanged.connect(self.atualizar_velocidade)
+        
+        # -- QGroupBox: Seleção de Bomba (Lista) --
         self.pump_list_box = QGroupBox("Seleção de Bomba (Lista)", left_widget)
         list_layout = QVBoxLayout(self.pump_list_box)
-        # Botão "Selecionar Bomba" acima da lista
         self.btn_selecionar_bomba = QPushButton("Selecionar Bomba", self.pump_list_box)
         self.btn_selecionar_bomba.clicked.connect(self.selecionar_bomba)
         list_layout.addWidget(self.btn_selecionar_bomba)
@@ -137,36 +162,42 @@ class PumpSelectionWidget(QWidget):
         list_layout.addWidget(self.list_widget)
         left_layout.addWidget(self.pump_list_box)
         
-        # QGroupBox: Seleção de Bomba (Filtros)
-        self.pump_filter_box = QGroupBox("Seleção de Bomba (Filtros)", left_widget)
-        filter_layout = QFormLayout(self.pump_filter_box)
-        # Cria os QComboBox para os filtros
-        self.combo_marca = QComboBox(self)
-        self.combo_modelo = QComboBox(self)
-        self.combo_diametro = QComboBox(self)
-        self.combo_rotacao = QComboBox(self)
-        # Item neutro "Selecione"
-        self.combo_marca.addItem("Selecione")
-        self.combo_modelo.addItem("Selecione")
-        self.combo_diametro.addItem("Selecione")
-        self.combo_rotacao.addItem("Selecione")
-        filter_layout.addRow("Marca:", self.combo_marca)
-        filter_layout.addRow("Modelo:", self.combo_modelo)
-        # Botão "Mostrar Gráfico da Bomba" logo abaixo do modelo
-        filter_layout.addRow("Diametro:", self.combo_diametro)
-        filter_layout.addRow("Rotação:", self.combo_rotacao)
-        self.btn_mostrar_grafico = QPushButton("Mostrar Gráfico da Bomba", self)
-        filter_layout.addRow("", self.btn_mostrar_grafico)
-        left_layout.addWidget(self.pump_filter_box)
-        
-        # Conecta os sinais dos QComboBox para atualização encadeada
-        self.combo_marca.currentIndexChanged.connect(self.on_marca_changed)
-        self.combo_modelo.currentIndexChanged.connect(self.on_modelo_changed)
-        self.combo_diametro.currentIndexChanged.connect(self.on_diametro_changed)
-        # Conecta o botão "Mostrar Gráfico da Bomba" (placeholder)
-        self.btn_mostrar_grafico.clicked.connect(self.mostrar_grafico_bomba)
-        
+        # -- QGroupBox: Dados da Bomba (resultados) --
+        self.pump_data_box = QGroupBox("Dados da Bomba", left_widget)
+        data_layout = QFormLayout(self.pump_data_box)
+
+        self.result_flow = QLineEdit()
+        self.result_flow.setReadOnly(True)
+        data_layout.addRow("Vazão:", self.result_flow)
+
+        self.result_head = QLineEdit()
+        self.result_head.setReadOnly(True)
+        data_layout.addRow("Head:", self.result_head)
+
+        self.result_pump = QLineEdit()
+        self.result_pump.setReadOnly(True)
+        data_layout.addRow("Bomba (Marca/Modelo):", self.result_pump)
+
+        # Novo campo para Diâmetro do rotor
+        self.result_rotor_diametro = QLineEdit()
+        self.result_rotor_diametro.setReadOnly(True)
+        data_layout.addRow("Diâmetro do rotor:", self.result_rotor_diametro)
+
+        self.result_eff = QLineEdit()
+        self.result_eff.setReadOnly(True)
+        data_layout.addRow("Eficiência:", self.result_eff)
+
+        self.result_power = QLineEdit()
+        self.result_power.setReadOnly(True)
+        data_layout.addRow("Potência Absorvida:", self.result_power)
+
+        self.result_npsh = QLineEdit()
+        self.result_npsh.setReadOnly(True)
+        data_layout.addRow("NPSH Requerido:", self.result_npsh)
+
+        left_layout.addWidget(self.pump_data_box)
         left_layout.addStretch()
+
         
         # Botões finais
         self.btn_adicionar_curva = QPushButton("Adicionar nova curva de bomba", left_widget)
@@ -190,263 +221,145 @@ class PumpSelectionWidget(QWidget):
         
         main_layout.addWidget(left_widget, 3)
         main_layout.addWidget(right_widget, 7)
-        
-        # Carrega dados iniciais nos filtros
-        self.load_marcas()
     
     def setup_db_timer(self):
         """Configura um timer para monitorar alterações no banco de dados."""
-        self.last_db_mod_time = os.path.getmtime(DB_PATH)
+        self.last_db_mod_time = os.path.getmtime("./src/db/pump_data.db")
         self.timer = QTimer(self)
-        self.timer.setInterval(2000)  # a cada 2 segundos
+        self.timer.setInterval(2000)
         self.timer.timeout.connect(self.check_db_update)
         self.timer.start()
     
-    # --- Funções de acesso ao banco de dados (antes no pump_db_selection.py) ---
-    def get_db_connection(self):
-        return sqlite3.connect(DB_PATH)
-    
-    def load_marcas(self):
-        self.combo_marca.blockSignals(True)
-        self.combo_marca.clear()
-        self.combo_marca.addItem("Selecione")
-        try:
-            conn = self.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT marca FROM pump_models ORDER BY marca;")
-            for row in cursor.fetchall():
-                self.combo_marca.addItem(str(row[0]))
-        except Exception as e:
-            print("Erro ao carregar marcas:", e)
-        finally:
-            conn.close()
-        self.combo_marca.blockSignals(False)
-        self.reset_combo(self.combo_modelo)
-        self.reset_combo(self.combo_diametro)
-        self.reset_combo(self.combo_rotacao)
-        self.combo_modelo.setEnabled(False)
-        self.combo_diametro.setEnabled(False)
-        self.combo_rotacao.setEnabled(False)
-    
-    def on_marca_changed(self, index):
-        marca = self.combo_marca.currentText()
-        if marca != "Selecione":
-            self.load_modelos(marca)
-            self.combo_modelo.setEnabled(True)
-        else:
-            self.reset_combo(self.combo_modelo)
-            self.reset_combo(self.combo_diametro)
-            self.reset_combo(self.combo_rotacao)
-            self.combo_modelo.setEnabled(False)
-            self.combo_diametro.setEnabled(False)
-            self.combo_rotacao.setEnabled(False)
-    
-    def load_modelos(self, marca):
-        self.combo_modelo.blockSignals(True)
-        self.combo_modelo.clear()
-        self.combo_modelo.addItem("Selecione")
-        try:
-            conn = self.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT modelo FROM pump_models WHERE marca = ? ORDER BY modelo;", (marca,))
-            for row in cursor.fetchall():
-                self.combo_modelo.addItem(str(row[0]))
-        except Exception as e:
-            print("Erro ao carregar modelos:", e)
-        finally:
-            conn.close()
-        self.combo_modelo.blockSignals(False)
-        self.reset_combo(self.combo_diametro)
-        self.reset_combo(self.combo_rotacao)
-        self.combo_diametro.setEnabled(False)
-        self.combo_rotacao.setEnabled(False)
-    
-    def on_modelo_changed(self, index):
-        modelo = self.combo_modelo.currentText()
-        if modelo != "Selecione":
-            self.load_diametros(modelo)
-            self.combo_diametro.setEnabled(True)
-        else:
-            self.reset_combo(self.combo_diametro)
-            self.reset_combo(self.combo_rotacao)
-            self.combo_diametro.setEnabled(False)
-            self.combo_rotacao.setEnabled(False)
-    
-    def load_diametros(self, modelo):
-        self.combo_diametro.blockSignals(True)
-        self.combo_diametro.clear()
-        self.combo_diametro.addItem("Selecione")
-        try:
-            conn = self.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT diametro FROM pump_models WHERE modelo = ? ORDER BY diametro;", (modelo,))
-            for row in cursor.fetchall():
-                self.combo_diametro.addItem(str(row[0]))
-        except Exception as e:
-            print("Erro ao carregar diametros:", e)
-        finally:
-            conn.close()
-        self.combo_diametro.blockSignals(False)
-        self.reset_combo(self.combo_rotacao)
-        self.combo_rotacao.setEnabled(False)
-    
-    def on_diametro_changed(self, index):
-        diametro = self.combo_diametro.currentText()
-        if diametro != "Selecione":
-            self.load_rotacoes(diametro)
-            self.combo_rotacao.setEnabled(True)
-        else:
-            self.reset_combo(self.combo_rotacao)
-            self.combo_rotacao.setEnabled(False)
-    
-    def load_rotacoes(self, diametro):
-        self.combo_rotacao.blockSignals(True)
-        self.combo_rotacao.clear()
-        self.combo_rotacao.addItem("Selecione")
-        try:
-            conn = self.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT rotacao FROM pump_models WHERE diametro = ? ORDER BY rotacao;", (diametro,))
-            for row in cursor.fetchall():
-                self.combo_rotacao.addItem(str(row[0]))
-        except Exception as e:
-            print("Erro ao carregar rotações:", e)
-        finally:
-            conn.close()
-        self.combo_rotacao.blockSignals(False)
-    
-    def reset_combo(self, combo):
-        combo.blockSignals(True)
-        combo.clear()
-        combo.addItem("Selecione")
-        combo.blockSignals(False)
-    
     def check_db_update(self):
         try:
-            current_mod_time = os.path.getmtime(DB_PATH)
+            current_mod_time = os.path.getmtime("./src/db/pump_data.db")
             if current_mod_time != self.last_db_mod_time:
                 self.last_db_mod_time = current_mod_time
-                self.reload_all()
+                # Atualizações se necessárias
         except Exception as e:
             print("Erro ao verificar atualização do banco de dados:", e)
     
-    def reload_all(self):
-        self.load_marcas()
-    
-    def mostrar_grafico_bomba(self):
-        # Placeholder: aqui você pode implementar a exibição do gráfico da bomba selecionada
-        print("Mostrar gráfico da bomba (placeholder).")
-    
-    # --- Funções para seleção automática de bomba via lista ---
-    def selecionar_bomba(self):
+    def atualizar_velocidade(self):
         """
-        Método chamado pelo botão "Selecionar Bomba" do grupo de lista.
-        Utiliza os parâmetros do sistema (system_curve e target_flow) para chamar a função
-        auto_pump_selection, ordena as bombas por eficiência (maior para menor) e atualiza o QListWidget
-        com os resultados. Cada item da lista possui um tooltip com informações adicionais e
-        feedback visual ao ser selecionado.
+        Calcula e atualiza a velocidade do fluido com base na vazão e no diâmetro selecionado.
+        A fórmula utilizada é: v = Q / A, onde Q (m³/s) é a vazão convertida e A = π*(d/2)².
+        O diâmetro (d) é obtido a partir do dropdown usando size_dict_internal_diameter_sch40.
+        """
+        try:
+            q_m3_h = float(self.line_edit_vazao.text())
+        except ValueError:
+            self.line_edit_velocity.setText("")
+            return
+        # Converte vazão de m³/h para m³/s
+        q_m3_s = q_m3_h / 3600.0
+        # Obtém o valor selecionado no dropdown
+        selected_size = self.combo_diametro_pipe.currentText()  # Debug
+        try:
+            d = size_dict_internal_diameter_sch40[selected_size]*0.001  # Converte para metros
+        except KeyError:
+            print("Chave não encontrada para o diâmetro, utilizando valor padrão 0.05 m")
+            d = 0.05  # Valor padrão se não encontrado
+        area = np.pi * (d / 2) ** 2
+        velocity = q_m3_s / area
+        self.line_edit_velocity.setText(f"{velocity:.2f}")
+
+        
+    def formatar_item_lista(self, pump: Dict[str, Any]) -> tuple[str, str]:
+        """
+        Formata o texto do item e o tooltip a partir dos dados da bomba.
+        """
+        # Valor de vazão de operação, com validação do campo 'intersecoes'
+        try:
+            operacao_vazao = pump['intersecoes'][0][0]
+        except (KeyError, IndexError):
+            operacao_vazao = 0.0
+
+        item_text = (f"Marca: {pump.get('marca', 'N/D')}, Modelo: {pump.get('modelo', 'N/D')}, "
+                     f"Diâmetro: {pump.get('diametro', 'N/D')}, Rotação: {pump.get('rotacao', 'N/D')}, "
+                     f"Eff.: {pump.get('pump_eff', 0):.2f}")
+        tooltip_text = (f"Vazão: {operacao_vazao:.2f} m³/h\n"
+                        f"Rotação: {pump.get('rotacao', 'N/D')} rpm\n"
+                        f"NPSHr: {pump.get('pump_npshr', 0):.1f} m\n"
+                        f"Potência: {pump.get('pump_power', 0):.1f} cv")
+        return item_text, tooltip_text
+
+    def selecionar_bomba(self) -> None:
+        """
+        Executa o cálculo do sistema, chama auto_pump_selection e atualiza a lista com os resultados.
+        O target_flow é obtido a partir do campo de vazão.
+        Ordena as bombas pela proximidade do ponto de operação (vazão de interseção) com o target_flow.
         """
         self.system_curve, self.target_flow = self.calcular_sistema()
         if self.system_curve is None or self.target_flow is None:
-            print("Parâmetros do sistema não definidos.")
+            logging.error("Parâmetros do sistema não definidos.")
             return
 
         pumps = auto_pump_selection(self.system_curve, self.target_flow)
-        print(pumps)
-
+        logging.info(f"Bombas selecionadas: {pumps}")
         self.list_widget.clear()
 
         if isinstance(pumps, str):
             self.list_widget.addItem(pumps)
-            self.pumps = []  # Garante que self.pumps seja uma lista vazia
+            self.pumps = []
         elif pumps:
-            # Ordena as bombas por eficiência (pump_eff) de forma decrescente
-            pumps_sorted = sorted(pumps, key=lambda p: p.get('pump_eff', 0), reverse=True)
-            self.pumps = pumps_sorted  # Atualiza o atributo self.pumps com a lista ordenada
-
-            for pump in self.pumps:
-                item_text = (f"Marca: {pump['marca']}, Modelo: {pump['modelo']}, "
-                            f"Diâmetro: {pump['diametro']}, Rotação: {pump['rotacao']}, "
-                            f"Eff.: {pump['pump_eff']:.2f}")
-                list_item = QListWidgetItem(item_text)
-                # Configura o tooltip com informações adicionais:
-                # Inclui Rotação, NPSHr, Potência e o ponto de interseção de vazão (fluxo)
-                tooltip_text = (
-                    f"Vazão: {pump['intersecoes'][0][0]:.2f}m³/h\n"
-                    f"Rotação: {pump['rotacao']}rpm\n"
-                    f"NPSHr: {pump['pump_npshr']:.1f}m\n"
-                    f"Potência: {pump['pump_power']:.1f}cv"
+            # Ordena as bombas pela proximidade do ponto de interseção com o target_flow,
+            # garantindo que a bomba com a vazão de operação mais próxima do target apareça primeiro.
+            try:
+                pumps_sorted = sorted(
+                    pumps,
+                    key=lambda p: abs(p.get('intersecoes', [[self.target_flow]])[0][0] - self.target_flow)
                 )
+            except Exception as e:
+                logging.error(f"Erro ao ordenar bombas: {e}")
+                pumps_sorted = pumps
+
+            self.pumps = pumps_sorted
+            for pump in self.pumps:
+                item_text, tooltip_text = self.formatar_item_lista(pump)
+                list_item = QListWidgetItem(item_text)
                 list_item.setToolTip(tooltip_text)
                 self.list_widget.addItem(list_item)
-
-            # Define feedback visual: muda a cor de fundo do item selecionado
             self.list_widget.setStyleSheet("QListWidget::item:selected { background-color: lightblue; }")
         else:
             self.list_widget.addItem("Nenhuma bomba encontrada.")
 
 
     
-    def set_system_curve(self, system_curve, target_flow):
-        """
-        Define os parâmetros necessários para a seleção automática de bomba:
-         - system_curve: coeficientes da curva do sistema (polinômio de grau 5)
-         - target_flow: fluxo alvo (valor máximo), normalmente obtido do cálculo em PumpSelectionWidget
-        """
-        self.system_curve = system_curve
-        self.target_flow = target_flow
-
-    # --- Outras funções do PumpSelectionWidget ---
     def abrir_curve_input_dialog(self):
         dialog = CurveInputDialog(self)
         dialog.exec()
     
-    def atualizar_plot(self, flow_values, system_head_values_coef, pump_head_coef_values=None, pump_vazao_min = None, pump_vazao_max = None, intersection_point=None):
-        """
-        Atualiza o plot com as curvas fornecidas.
-
-        Parâmetros:
-            flow_values (array): Valores de fluxo (eixo X) para o plot.
-            system_head_values_coef (array): Coeficientes da curva do sistema.
-            pump_head_coef_values (array, opcional): Coeficientes da curva da bomba.
-            intersection_point (tuple, opcional): Ponto de intersecção (x, y) entre as curvas,
-                                                fornecido somente se ambos os coeficientes forem passados.
-
-        Se os coeficientes da bomba forem fornecidos, plota as duas curvas e, se disponível, o ponto de intersecção.
-        Caso contrário, plota somente a curva do sistema.
-        """
+    def atualizar_plot(self, flow_values, system_head_values_coef, pump_head_coef_values=None, pump_vazao_min=None, pump_vazao_max=None, intersection_point=None):
         self.ax.clear()
-        
-        # Plota a curva do sistema
         system_head_values = np.polyval(system_head_values_coef, flow_values)
         self.ax.plot(flow_values, system_head_values, linestyle='-', label='Curva do Sistema')
-        
-        # Verifica se os coeficientes da bomba foram passados para plotagem
         if pump_head_coef_values is not None:
-            pump_flow_value = np.linspace(pump_vazao_min, pump_vazao_max, 500)
-            pump_head_values = np.polyval(pump_head_coef_values, pump_flow_value)
-            self.ax.plot(pump_flow_value, pump_head_values, linestyle='--', label='Curva da Bomba')
-            # Se o ponto de intersecção também foi passado, plota-o
+            pump_flow_values = np.linspace(pump_vazao_min, pump_vazao_max, 500)
+            pump_head_values = np.polyval(pump_head_coef_values, pump_flow_values)
+            self.ax.plot(pump_flow_values, pump_head_values, linestyle='--', label='Curva da Bomba')
             if intersection_point is not None:
                 self.ax.plot(intersection_point[0], intersection_point[1], 'ro', label='Intersecção')
-        
         self.ax.set_xlabel("Flow (m³/h)")
         self.ax.set_ylabel("Head")
         self.ax.set_title("Curva do Sistema x Curva da Bomba")
         self.ax.legend()
+            # Configura o limite inferior do eixo y para 0
+        self.ax.set_ylim(bottom=0)
         self.canvas.draw()
-
+    
     def calcular_sistema(self):
         """
         Executa o cálculo do sistema utilizando os valores dos widgets injetados,
-        plota o ajuste polinomial como linha contínua e retorna os parâmetros necessários
+        plota o ajuste polinomial e retorna os parâmetros (system_curve e target_flow)
         para a seleção automática de bomba.
+        O target_flow é obtido a partir do campo de vazão.
         """
-        # Extrai os valores dos widgets de entrada (métodos do system_input_widget e fluid_prop_input_widget)
+
+        
         spinbox_suction = self.system_input_widget.get_spinbox_values_suction()
-        suction_size = self.system_input_widget.get_suction_size()
+        suction_size = self.combo_diametro_pipe.currentText()
         spinbox_discharge = self.system_input_widget.get_spinbox_values_discharge()
-        discharge_size = self.system_input_widget.get_discharge_size()
+        discharge_size = self.combo_diametro_pipe.currentText()
         mu_value = self.fluid_prop_input_widget.get_mu_input_value()
         rho_value = self.fluid_prop_input_widget.get_rho_input_value()
         print(spinbox_suction, suction_size, spinbox_discharge, discharge_size, mu_value, rho_value)
@@ -461,35 +374,26 @@ class PumpSelectionWidget(QWidget):
             target_flow, mu_value, rho_value
         )
         
-        # Cria os valores de fluxo e armazena em self.flow_values para uso futuro
         flow_values = np.linspace(min_flow, max_flow, 500)
         self.flow_values = flow_values
-        
-        # Atualiza o plot chamando a função separada, passando somente a curva do sistema
         self.atualizar_plot(flow_values, head_values_coef)
-        
         print("O cálculo do sistema foi feito com ajuste polinomial (linha contínua)!")
         
-        # Define os parâmetros no grupo de seleção por lista
-        self.set_system_curve(head_values_coef, target_flow)
+        self.system_curve = head_values_coef
+        self.target_flow = target_flow
         return head_values_coef, target_flow
         
     def get_target_flow(self):
         try:
+            # Utiliza o valor da vazão como target_flow
             return float(self.line_edit_vazao.text())
         except ValueError:
-            QMessageBox.critical(self, "Erro", "Insira o valor da vazão desejada corretamente!")
+            QMessageBox.critical(self, "Erro", "Insira o valor da Vazão corretamente!")
             return None
-
+    
     def on_item_double_clicked(self, item):
         """
-        Função acionada ao dar duplo clique em um item da lista de seleção de bomba.
-        Recupera o índice do item clicado, obtém o dicionário correspondente em self.pumps e chama
-        atualizar_plot, passando:
-        - self.flow_values (eixo X)
-        - self.system_curve (coeficientes da curva do sistema)
-        - pump['pump_coef_head'] (coeficiente da curva da bomba)
-        - pump['intersecoes'] (ponto(s) de interseção)
+        Ao dar duplo clique em um item da lista, atualiza os campos do grupo Dados da Bomba.
         """
         index = self.list_widget.row(item)
         try:
@@ -498,7 +402,25 @@ class PumpSelectionWidget(QWidget):
             print("Índice inválido no array de bombas.")
             return
 
-        # Exibe os dados da bomba selecionada
+        # Formatação dos números com vírgula como separador decimal
+        flow_str = f"{pump['intersecoes'][0][0]:.2f}".replace('.', ',')
+        head_value = np.polyval(self.system_curve, pump['intersecoes'][0][0])
+        head_str = f"{head_value:.2f}".replace('.', ',')
+        eff_str = f"{pump['pump_eff']:.2f}".replace('.', ',')
+        power_str = f"{pump['pump_power']:.2f}".replace('.', ',')
+        npsh_str = f"{pump['pump_npshr']:.2f}".replace('.', ',')
+
+        self.result_flow.setText(flow_str + " m³/h")
+        self.result_head.setText(head_str)
+        self.result_pump.setText(f"{pump['marca']} / {pump['modelo']}")
+        self.result_eff.setText(eff_str + "%")
+        self.result_power.setText(power_str + " cv")
+        self.result_npsh.setText(npsh_str + " m")
+        
+        # Atualiza o novo campo com o diâmetro do rotor
+        self.result_rotor_diametro.setText(pump['diametro'])
+
+        # Exibe os dados da bomba selecionada no console
         print(f"Selecionada Bomba -> Marca: {pump['marca']}, Modelo: {pump['modelo']}, "
             f"Diâmetro: {pump['diametro']}, Rotação: {pump['rotacao']}")
 
@@ -510,7 +432,8 @@ class PumpSelectionWidget(QWidget):
         # Atualiza o gráfico com a curva do sistema e a curva da bomba (e o(s) ponto(s) de interseção, se disponível)
         self.atualizar_plot(pump_flow_values, self.system_curve, pump_head_coef_values, pump_vazao_min, pump_vazao_max, intersection_points)
 
-    
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     # Widgets dummy para injeção; substitua pelos reais conforme necessário
