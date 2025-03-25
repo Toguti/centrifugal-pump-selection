@@ -49,60 +49,6 @@ class SystemInputWidget(QWidget):
         self.quantity_suction = []
         self.quantity_discharge = []
 
-        # Size of the line
-        ## suction
-        suction_size_layout = QHBoxLayout()
-        suction_size_layout.addWidget(QLabel("Bitola"))
-
-        self.input_size_list_suction = QComboBox()
-        self.input_size_list_suction.addItems([
-                "13 (1/2\")",
-                "19 (3/4\")",
-                "25 (1\")",
-                "32 (1.1/4\")",
-                "38 (1.1/2\")",
-                "50 (2\")",
-                "63 (2.1/2\")",
-                "75 (3\")",
-                "100 (4\")",
-                "125 (5\")",
-                "150 (6\")",
-                "200 (8\")",
-                "250 (10\")",
-                "300 (12\")",
-                "350 (14\")",
-                ])
-        
-        suction_size_layout.addWidget(self.input_size_list_suction)
-        suction_input_box_layout.addLayout(suction_size_layout)
-
-        ## discharge
-        discharge_size_layout = QHBoxLayout()
-        discharge_size_layout.addWidget(QLabel("Bitola"))
-
-        self.input_size_list_discharge = QComboBox()
-        self.input_size_list_discharge.addItems([
-                "13 (1/2\")",
-                "19 (3/4\")",
-                "25 (1\")",
-                "32 (1.1/4\")",
-                "38 (1.1/2\")",
-                "50 (2\")",
-                "63 (2.1/2\")",
-                "75 (3\")",
-                "100 (4\")",
-                "125 (5\")",
-                "150 (6\")",
-                "200 (8\")",
-                "250 (10\")",
-                "300 (12\")",
-                "350 (14\")",
-                ])
-        
-        discharge_size_layout.addWidget(self.input_size_list_discharge)
-        discharge_input_box_layout.addLayout(discharge_size_layout)
-
-
         # Headers
         input_header = QHBoxLayout()
         input_header.addWidget(QLabel("Descrição"))
@@ -132,6 +78,7 @@ class SystemInputWidget(QWidget):
             if label == "Trecho Retilineo":
                 input_spin_box.setDecimals(2)
                 input_spin_box.setSingleStep(0.1)
+                input_spin_box.setMaximum(99999)
 
             # Adicionar uma referência ao input_spin_box
             self.quantity_suction.append(input_spin_box)
@@ -160,6 +107,7 @@ class SystemInputWidget(QWidget):
             if label == "Trecho Retilineo":
                 input_spin_box.setDecimals(2)
                 input_spin_box.setSingleStep(0.1)
+                input_spin_box.setMaximum(99999)
 
             # Adicionar uma referência ao input_spin_box
             self.quantity_discharge.append(input_spin_box)
