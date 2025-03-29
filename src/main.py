@@ -11,10 +11,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction
 import sys
-from UI.system_calculator import InputTable
 from UI.fluid_prop_tab import FluidPropInput
 from UI.pipe_table_tab import *
-from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 from UI.pump_selection_tab import PumpSelectionWidget
 
 class MainWindow(QMainWindow):

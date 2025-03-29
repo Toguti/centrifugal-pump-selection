@@ -8,7 +8,7 @@ import json
 def create_database(db_path: str) -> None:
     """
     Cria o banco de dados e a tabela pump_models, se não existir.
-    A tabela inclui as novas colunas: eff_bop, eff_bop_flow, p80_eff_bop_flow e p110_eff_bop_flow.
+    A tabela inclui as novas colunas: eff_bop, eff_bop_flow, p80_eff_bop_flow, p110_eff_bop_flow e estagios.
     """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -20,6 +20,7 @@ def create_database(db_path: str) -> None:
             modelo TEXT NOT NULL,
             diametro TEXT NOT NULL,
             rotacao TEXT NOT NULL,
+            estagios TEXT NOT NULL,
             vazao_min REAL NOT NULL,
             vazao_max REAL NOT NULL,
             coef_head TEXT NOT NULL,
@@ -30,7 +31,7 @@ def create_database(db_path: str) -> None:
             eff_bop_flow REAL NOT NULL,
             p80_eff_bop_flow REAL NOT NULL,
             p110_eff_bop_flow REAL NOT NULL,       
-            UNIQUE(marca, modelo, diametro, rotacao)
+            UNIQUE(marca, modelo, diametro, rotacao, estagios)
         )
     """)
     conn.close()
@@ -51,7 +52,7 @@ def inserir_bombas_em_lote(conn: sqlite3.Connection, registros: list) -> None:
     """
     Insere múltiplos registros de bombas no banco de dados utilizando INSERT OR IGNORE.
     
-    A tabela possui restrição UNIQUE em (marca, modelo, diametro, rotacao),
+    A tabela possui restrição UNIQUE em (marca, modelo, diametro, rotacao, estagios),
     garantindo que registros duplicados sejam ignorados sem gerar exceção.
     
     Registra, via log, quantos registros foram inseridos e quantos foram ignorados.
@@ -62,9 +63,9 @@ def inserir_bombas_em_lote(conn: sqlite3.Connection, registros: list) -> None:
     """
     sql = """
     INSERT OR IGNORE INTO pump_models 
-    (marca, modelo, diametro, rotacao, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power,
+    (marca, modelo, diametro, rotacao, estagios, vazao_min, vazao_max, coef_head, coef_eff, coef_npshr, coef_power,
      eff_bop, eff_bop_flow, p80_eff_bop_flow, p110_eff_bop_flow)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     with conn:
         before_changes = conn.total_changes
@@ -80,7 +81,7 @@ def transferir_csv_para_db(conn: sqlite3.Connection, caminho_csv: str, chunksize
     Lê um arquivo CSV utilizando pandas e insere os registros no banco de dados.
     
     Espera que o CSV possua as colunas:
-      - 'Marca', 'Modelo', 'Diameter', 'Rotation', 'min_flow', 'max_flow',
+      - 'Marca', 'Modelo', 'Diameter', 'Rotation', 'Stages', 'min_flow', 'max_flow',
       - 'flowxhead', 'flowxeff', 'flowxnpsh', 'flowxpower',
       - 'eff_bop', 'eff_bop_flow', 'p80_eff_bop_flow', 'p110_eff_bop_flow'
     """
@@ -93,6 +94,7 @@ def transferir_csv_para_db(conn: sqlite3.Connection, caminho_csv: str, chunksize
         # Conversão de tipos para compatibilidade com o banco
         df['Diameter'] = df['Diameter'].astype(str)
         df['Rotation'] = df['Rotation'].astype(str)
+        df['Stages'] = df['Stages'].astype(str)  # Nova coluna de estágios
         df['min_flow'] = df['min_flow'].astype(float)
         df['max_flow'] = df['max_flow'].astype(float)
         # Caso seja necessário, converta os coeficientes para string
@@ -107,7 +109,7 @@ def transferir_csv_para_db(conn: sqlite3.Connection, caminho_csv: str, chunksize
         df['p110_eff_bop_flow'] = df['p110_eff_bop_flow'].astype(float)
 
         # Seleção e ordenação das colunas conforme a estrutura da tabela
-        registros = df[['Marca', 'Modelo', 'Diameter', 'Rotation', 'min_flow', 'max_flow', 
+        registros = df[['Marca', 'Modelo', 'Diameter', 'Rotation', 'Stages', 'min_flow', 'max_flow', 
                         'flowxhead', 'flowxeff', 'flowxnpsh', 'flowxpower',
                         'eff_bop', 'eff_bop_flow', 'p80_eff_bop_flow', 'p110_eff_bop_flow']].to_records(index=False)
         

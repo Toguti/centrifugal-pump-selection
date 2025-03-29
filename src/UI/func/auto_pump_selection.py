@@ -86,13 +86,12 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
     """
     Seleciona os modelos de bomba cujas curvas de desempenho (coef_head) se interceptam com a curva do sistema.
 
-    Apenas bombas cujo intervalo de vazão (vazao_min e vazao_max) esteja dentro do intervalo global
+    Apenas bombas cujo intervalo de vazão (vazao_min e vazao_max) esteja dentro do intervalo especificado
     e que possuam pontos de interseção entre seus próprios limites são consideradas.
 
     Parâmetros:
         coef_system_curve (np.ndarray): Coeficientes do polinômio do sistema (grau 5).
-        global_min_flow (float): Fluxo mínimo do intervalo global.
-        global_max_flow (float): Fluxo máximo do intervalo global.
+        target_flow (float): Vazão alvo para seleção de bombas.
     
     Retorna:
         list ou str: Lista de dicionários contendo os dados da bomba, os pontos de interseção e os
@@ -106,9 +105,11 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
     cursor = conn.cursor()
     
     try:
-        # Query atualizada: seleciona todas as colunas necessárias
+        # Query atualizada com a estrutura correta de colunas
         query = """
-        SELECT marca, modelo, diametro, rotacao, coef_head, coef_eff, coef_npshr, coef_power, vazao_min, vazao_max, eff_bop, eff_bop_flow, p80_eff_bop_flow, p110_eff_bop_flow
+        SELECT marca, modelo, diametro, rotacao, estagios, vazao_min, vazao_max, 
+               coef_head, coef_eff, coef_npshr, coef_power, 
+               eff_bop, eff_bop_flow, p80_eff_bop_flow, p110_eff_bop_flow
         FROM pump_models
         WHERE p110_eff_bop_flow >= ? AND p80_eff_bop_flow <= ?
         """
@@ -121,8 +122,11 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
         
         # Processa cada bomba
         for pump in pump_models:
-            marca, modelo, diametro, rotacao, coef_head_str, coef_eff_str, coef_npshr_str, coef_power_str, pump_vazao_min, pump_vazao_max, pump_eff_bop, pump_eff_bop_flow, pump_p80_eff_bop_flow, pump_p110_eff_bop_flow = pump
+            marca, modelo, diametro, rotacao, estagios, pump_vazao_min, pump_vazao_max, coef_head_str, \
+            coef_eff_str, coef_npshr_str, coef_power_str, pump_eff_bop, pump_eff_bop_flow, \
+            pump_p80_eff_bop_flow, pump_p110_eff_bop_flow = pump
             
+            print(coef_head_str)
             # Converte as strings de coeficientes para arrays NumPy
             try:
                 coef_pump = parse_coef_string(coef_head_str)
@@ -135,7 +139,7 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
             
             # Calcula os pontos de interseção entre a curva do sistema e a curva da bomba
             intersection_points = find_intersection_points(coef_system_curve, coef_pump,
-                                                           pump_p80_eff_bop_flow, pump_p110_eff_bop_flow)
+                                                          pump_p80_eff_bop_flow, pump_p110_eff_bop_flow)
             # Filtra os pontos para que estejam dentro do intervalo suportado pela bomba
             intersection_points = intersection_points[
                 (intersection_points >= pump_vazao_min) & (intersection_points <= pump_vazao_max)
@@ -157,6 +161,7 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
                     "modelo": modelo,
                     "diametro": diametro,
                     "rotacao": rotacao,
+                    "estagios": estagios,
                     "intersecoes": intersections,
                     "pump_coef_head": coef_pump,
                     "pump_coef_eff": coef_eff,
