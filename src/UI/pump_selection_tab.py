@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from typing import List, Union, Dict, Any
+from typing import Dict, Any
 import logging
 
 # Importa a função de cálculo da curva do sistema
@@ -33,7 +33,7 @@ from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_los
 # Importa a função de seleção automática de bomba
 from UI.func.auto_pump_selection import auto_pump_selection
 # Importa as funções auxiliares para perdas locais
-from UI.extra.local_loss import size_dict_internal_diameter_sch40, size_dict, get_size_singularities_loss_values
+from UI.extra.local_loss import size_dict_internal_diameter_sch40
 
 class FloatDelegate(QStyledItemDelegate):
     """Delegate para restringir a edição da célula a valores float."""
@@ -362,7 +362,7 @@ class PumpSelectionWidget(QWidget):
         discharge_size = self.combo_diametro_pipe.currentText()
         mu_value = self.fluid_prop_input_widget.get_mu_input_value()
         rho_value = self.fluid_prop_input_widget.get_rho_input_value()
-        print(spinbox_suction, suction_size, spinbox_discharge, discharge_size, mu_value, rho_value)
+        roughness = self.fluid_prop_input_widget.get_roughness_value() ## Obtém o valor de rugosidade do tubo em mm
         
         target_flow = self.get_target_flow()
         if target_flow is None:
@@ -371,7 +371,7 @@ class PumpSelectionWidget(QWidget):
         head_values_coef, min_flow, max_flow = calculate_pipe_system_head_loss(
             spinbox_suction, suction_size,
             spinbox_discharge, discharge_size,
-            target_flow, mu_value, rho_value
+            target_flow, mu_value, rho_value, roughness/1000 # Converte rugosidade de mm para m
         )
         
         flow_values = np.linspace(min_flow, max_flow, 500)

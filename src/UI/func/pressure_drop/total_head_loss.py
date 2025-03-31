@@ -26,7 +26,7 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
     raise RuntimeError(f"Failed to converge after {max_iter} iterations.")
 
 
-def unified_pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
+def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
     """
     Calcula a perda de carga total (em metros de coluna de fluido) para um trecho de tubulação,
     considerando o comprimento linear, a perda por singularidades e a elevação.
@@ -81,7 +81,7 @@ def unified_pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
     # Retorna escalar se a entrada era um único valor de vazão
     return h_total[0] if h_total.size == 1 else h_total
 
-def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array, discharge_size, target_flow_value, mu, rho):
+def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array, discharge_size, target_flow_value, mu, rho, roughness):
     """
     Calcula a curva de perda de carga do sistema considerando:
         - Trecho de sucção: inclui comprimento físico, perdas locais (singularidades) e elevação.
@@ -139,7 +139,7 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
 
     # --- Cálculo das perdas de carga para cada trecho ---
     # Utiliza a função pressure_loss_array (já adaptada para operar com array de vazões)
-    head_loss_suction = unified_pressure_loss(
+    head_loss_suction = pressure_loss(
         D_suction,
         L_eff_suction,
         flow_values_array,
@@ -147,11 +147,11 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
         rho,
         g=9.81,
         h=suction_height,
-        K=0,          # K = 0 se todas as perdas locais já forem convertidas em comprimento equivalente
-        roughness=0.000015
-    )
+        K=0,          # K = 0 se todas as perdas locais já forem convertidas em comprimento equivalente 
+        roughness=roughness
+        )
 
-    head_loss_discharge = unified_pressure_loss(
+    head_loss_discharge = pressure_loss(
         D_discharge,
         L_eff_discharge,
         flow_values_array,
@@ -160,7 +160,7 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
         g=9.81,
         h=discharge_height,
         K=0,
-        roughness=0.000015
+        roughness=roughness
     )
 
     # --- Perda de carga total do sistema ---

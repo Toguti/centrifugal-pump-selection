@@ -3,11 +3,9 @@ from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
-    QHBoxLayout,
     QWidget,
     QTabWidget,
-    QMessageBox,
-    QPushButton,
+    QMessageBox
 )
 from PyQt6.QtGui import QAction
 import sys
@@ -54,16 +52,6 @@ class MainWindow(QMainWindow):
         self.system_input_widget = SystemInputWidget()
         system_input_tab_layout.addWidget(self.system_input_widget)
 
-        # (Opcional) Remova ou comente o botão "Calcular" aqui, pois será usado na aba "Seleção da Bomba"
-        # calculate_button = QPushButton("Calcular")
-        # calculate_button.clicked.connect(self.calculate)
-        # system_buttons_widget = QWidget()
-        # system_buttons_layout = QHBoxLayout(system_buttons_widget)
-        # system_buttons_layout.addWidget(calculate_button)
-        # system_input_tab_layout.addWidget(system_buttons_widget)
-
-        ## Configuração da aba "Seleção da Bomba"
-        # Injeção dos widgets de entrada para utilização interna no PumpSelectionWidget
         self.pump_selection_widget = PumpSelectionWidget(
             system_input_widget=self.system_input_widget,
             fluid_prop_input_widget=self.fluid_prop_input_widget
