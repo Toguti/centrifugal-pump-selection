@@ -126,7 +126,6 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
             coef_eff_str, coef_npshr_str, coef_power_str, pump_eff_bop, pump_eff_bop_flow, \
             pump_p80_eff_bop_flow, pump_p110_eff_bop_flow = pump
             
-            print(coef_head_str)
             # Converte as strings de coeficientes para arrays NumPy
             try:
                 coef_pump = parse_coef_string(coef_head_str)
@@ -178,33 +177,3 @@ def auto_pump_selection(coef_system_curve: np.ndarray, target_flow: float):
         conn.close()
     
     return results
-
-
-
-# Exemplo de uso
-# if __name__ == '__main__':
-#     # Exemplo de coeficientes do sistema (polinômio de grau 5)
-#     coef_system_curve = np.array([
-#         -2.26728332e-10, 1.84845669e-08, -5.71944041e-07,
-#         3.32206969e-04, 1.57151363e-04, 5.70842371e+00
-#     ])
-#     
-#     # Define o intervalo global de fluxo desejado
-#     global_min_flow = 0.0
-#     global_max_flow = 100.0  # Ajuste conforme necessário
-#     
-#     # Chama a função para selecionar as bombas
-#     pumps_found = auto_pump_selection(coef_system_curve, global_min_flow, global_max_flow)
-#     
-#     # Exibe os resultados
-#     if isinstance(pumps_found, str):
-#         # Caso não haja nenhuma bomba no intervalo
-#         print(pumps_found)
-#     elif pumps_found:
-#         print("Bombas encontradas com interseção:")
-#         for pump in pumps_found:
-#             print(f"Marca: {pump['marca']}, Modelo: {pump['modelo']}, "
-#                   f"Diâmetro: {pump['diametro']}, Rotação: {pump['rotacao']}")
-#             print(f"Ponto(s) de interseção (x, y): {pump['intersecoes']}\n")
-#     else:
-#         print("Nenhum modelo de bomba apresentou interseção no intervalo especificado.")

@@ -28,12 +28,8 @@ from matplotlib.figure import Figure
 from typing import Dict, Any
 import logging
 
-# Importa a função de cálculo da curva do sistema
-from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 # Importa a função de seleção automática de bomba
 from UI.func.auto_pump_selection import auto_pump_selection
-# Importa as funções auxiliares para perdas locais
-from UI.extra.local_loss import size_dict_internal_diameter_sch40
 
 class FloatDelegate(QStyledItemDelegate):
     """Delegate para restringir a edição da célula a valores float."""
@@ -89,7 +85,7 @@ class CurveInputDialog(QDialog):
 class PumpSelectionWidget(QWidget):
     """
     Janela principal para gerenciar bombas e exibir curvas.
-    Neste código, o valor de "Vazão (m³/h)" é utilizado como target_flow.
+    Obtém os dados do SystemInputWidget para a seleção de bombas.
     """
     def __init__(self, system_input_widget, fluid_prop_input_widget, parent=None):
         super().__init__(parent)
@@ -97,6 +93,12 @@ class PumpSelectionWidget(QWidget):
         self.fluid_prop_input_widget = fluid_prop_input_widget
         self.system_curve = None
         self.target_flow = None
+        self.pumps = []
+        self.selected_pump_index = None
+        
+        # Conectar ao sinal de cálculo concluído do SystemInputWidget
+        self.system_input_widget.calculoCompleto.connect(self.atualizar_dados_sistema)
+        
         self.init_ui()
         self.setup_db_timer()
     
@@ -105,61 +107,55 @@ class PumpSelectionWidget(QWidget):
         self.resize(800, 600)
         main_layout = QHBoxLayout(self)
         
-        # Área Esquerda: inputs, resultados e botões
+        # Área Esquerda: resultados e botões
         left_widget = QWidget(self)
         left_layout = QVBoxLayout(left_widget)
         
-        # -- Campo de Vazão (que também será o target_flow) --
-        vazao_widget = QWidget(left_widget)
-        vazao_layout = QHBoxLayout(vazao_widget)
-        vazao_layout.setContentsMargins(0, 0, 0, 0)
-        label_vazao = QLabel("Vazão (m³/h):", vazao_widget)
-        vazao_layout.addWidget(label_vazao)
-        self.line_edit_vazao = QLineEdit(vazao_widget)
-        self.line_edit_vazao.setValidator(QDoubleValidator(0.0, 1e9, 2, self))
-        self.line_edit_vazao.setPlaceholderText("Informe a vazão")
-        vazao_layout.addWidget(self.line_edit_vazao)
-        left_layout.addWidget(vazao_widget)
+        # -- Informações do Sistema --
+        system_info_group = QGroupBox("Informações do Sistema", left_widget)
+        system_info_layout = QFormLayout(system_info_group)
         
-        # -- Dropdown para Diâmetro (Bitola) --
-        diametro_dropdown_widget = QWidget(left_widget)
-        diametro_dropdown_layout = QHBoxLayout(diametro_dropdown_widget)
-        diametro_dropdown_layout.setContentsMargins(0, 0, 0, 0)
-        label_diametro = QLabel("Diâmetro:", diametro_dropdown_widget)
-        diametro_dropdown_layout.addWidget(label_diametro)
-        self.combo_diametro_pipe = QComboBox(diametro_dropdown_widget)
-        # Preenche o dropdown com as chaves do dict size_dict_internal_diameter_sch40
-        self.combo_diametro_pipe.addItems(list(size_dict_internal_diameter_sch40.keys()))
-        diametro_dropdown_layout.addWidget(self.combo_diametro_pipe)
-        left_layout.addWidget(diametro_dropdown_widget)
+        # Campo de vazão de projeto - renomeado para maior clareza
+        self.system_target_flow = QLineEdit()
+        self.system_target_flow.setReadOnly(True)
+        system_info_layout.addRow("Vazão Total do Sistema:", self.system_target_flow)
         
-        # Conecta o sinal do dropdown para atualizar a velocidade
-        self.combo_diametro_pipe.currentIndexChanged.connect(self.atualizar_velocidade)
+        # Novo campo para Head de projeto
+        self.system_head = QLineEdit()
+        self.system_head.setReadOnly(True)
+        system_info_layout.addRow("Head de Projeto:", self.system_head)
         
-        # -- Campo de Velocidade do Fluido (display somente leitura) --
-        velocity_widget = QWidget(left_widget)
-        velocity_layout = QHBoxLayout(velocity_widget)
-        velocity_layout.setContentsMargins(0, 0, 0, 0)
-        label_velocity = QLabel("Velocidade (m/s):", velocity_widget)
-        velocity_layout.addWidget(label_velocity)
-        self.line_edit_velocity = QLineEdit(velocity_widget)
-        self.line_edit_velocity.setReadOnly(True)
-        self.line_edit_velocity.setPlaceholderText("Será calculada automaticamente")
-        velocity_layout.addWidget(self.line_edit_velocity)
-        left_layout.addWidget(velocity_widget)
+        # Campo de NPSH disponível
+        self.system_npsh_disponivel = QLineEdit()
+        self.system_npsh_disponivel.setReadOnly(True)
+        system_info_layout.addRow("NPSH Disponível:", self.system_npsh_disponivel)
         
-        # Conecta alteração da vazão para atualizar a velocidade
-        self.line_edit_vazao.textChanged.connect(self.atualizar_velocidade)
+        # Combo para número de bombas em paralelo
+        label_n_bombas = QLabel("N° de Bombas em Paralelo:")
+        self.combo_n_bombas = QComboBox()
+        self.combo_n_bombas.addItems([str(i) for i in range(1, 10)])  # 1 a 9
+        self.combo_n_bombas.currentIndexChanged.connect(self.atualizar_grafico_bombas_paralelo)
+        system_info_layout.addRow(label_n_bombas, self.combo_n_bombas)
+        
+        # Campo para vazão por bomba
+        self.vazao_por_bomba = QLineEdit()
+        self.vazao_por_bomba.setReadOnly(True)
+        system_info_layout.addRow("Vazão por Bomba de Projeto:", self.vazao_por_bomba)
+        
+        left_layout.addWidget(system_info_group)
         
         # -- QGroupBox: Seleção de Bomba (Lista) --
-        self.pump_list_box = QGroupBox("Seleção de Bomba (Lista)", left_widget)
+        self.pump_list_box = QGroupBox("Seleção de Bomba", left_widget)
         list_layout = QVBoxLayout(self.pump_list_box)
+        
         self.btn_selecionar_bomba = QPushButton("Selecionar Bomba", self.pump_list_box)
         self.btn_selecionar_bomba.clicked.connect(self.selecionar_bomba)
         list_layout.addWidget(self.btn_selecionar_bomba)
+        
         self.list_widget = QListWidget(self.pump_list_box)
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
         list_layout.addWidget(self.list_widget)
+        
         left_layout.addWidget(self.pump_list_box)
         
         # -- QGroupBox: Dados da Bomba (resultados) --
@@ -178,7 +174,7 @@ class PumpSelectionWidget(QWidget):
         self.result_pump.setReadOnly(True)
         data_layout.addRow("Bomba (Marca/Modelo):", self.result_pump)
 
-        # Novo campo para Diâmetro do rotor
+        # Campo para Diâmetro do rotor
         self.result_rotor_diametro = QLineEdit()
         self.result_rotor_diametro.setReadOnly(True)
         data_layout.addRow("Diâmetro do rotor:", self.result_rotor_diametro)
@@ -194,18 +190,23 @@ class PumpSelectionWidget(QWidget):
         self.result_npsh = QLineEdit()
         self.result_npsh.setReadOnly(True)
         data_layout.addRow("NPSH Requerido:", self.result_npsh)
+        
+        # Campo para margem de NPSH
+        self.result_npsh_comparison = QLineEdit()
+        self.result_npsh_comparison.setReadOnly(True)
+        data_layout.addRow("Margem de NPSH:", self.result_npsh_comparison)
 
         left_layout.addWidget(self.pump_data_box)
         left_layout.addStretch()
-
         
         # Botões finais
-        self.btn_adicionar_curva = QPushButton("Adicionar nova curva de bomba", left_widget)
+        button_layout = QHBoxLayout()
+        
+        self.btn_adicionar_curva = QPushButton("Adicionar Nova Curva", left_widget)
         self.btn_adicionar_curva.clicked.connect(self.abrir_curve_input_dialog)
-        left_layout.addWidget(self.btn_adicionar_curva)
-        self.btn_calcular = QPushButton("Calcular", left_widget)
-        self.btn_calcular.clicked.connect(self.calcular_sistema)
-        left_layout.addWidget(self.btn_calcular)
+        button_layout.addWidget(self.btn_adicionar_curva)
+        
+        left_layout.addLayout(button_layout)
         
         # Área Direita: Gráfico
         right_widget = QWidget(self)
@@ -213,9 +214,9 @@ class PumpSelectionWidget(QWidget):
         self.figure = Figure(figsize=(5, 4))
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
-        self.ax.set_xlabel("Flow (m³/h)")
-        self.ax.set_ylabel("Head")
-        self.ax.set_title("Pump Characteristic Curve")
+        self.ax.set_xlabel("Vazão (m³/h)")
+        self.ax.set_ylabel("Head (m)")
+        self.ax.set_title("Curva do Sistema x Curva da Bomba")
         self.canvas.draw()
         right_layout.addWidget(self.canvas)
         
@@ -239,199 +240,490 @@ class PumpSelectionWidget(QWidget):
         except Exception as e:
             print("Erro ao verificar atualização do banco de dados:", e)
     
-    def atualizar_velocidade(self):
+    def atualizar_dados_sistema(self):
         """
-        Calcula e atualiza a velocidade do fluido com base na vazão e no diâmetro selecionado.
-        A fórmula utilizada é: v = Q / A, onde Q (m³/s) é a vazão convertida e A = π*(d/2)².
-        O diâmetro (d) é obtido a partir do dropdown usando size_dict_internal_diameter_sch40.
+        Atualiza os dados do sistema após o cálculo no SystemInputWidget.
         """
-        try:
-            q_m3_h = float(self.line_edit_vazao.text())
-        except ValueError:
-            self.line_edit_velocity.setText("")
-            return
-        # Converte vazão de m³/h para m³/s
-        q_m3_s = q_m3_h / 3600.0
-        # Obtém o valor selecionado no dropdown
-        selected_size = self.combo_diametro_pipe.currentText()  # Debug
-        try:
-            d = size_dict_internal_diameter_sch40[selected_size]*0.001  # Converte para metros
-        except KeyError:
-            print("Chave não encontrada para o diâmetro, utilizando valor padrão 0.05 m")
-            d = 0.05  # Valor padrão se não encontrado
-        area = np.pi * (d / 2) ** 2
-        velocity = q_m3_s / area
-        self.line_edit_velocity.setText(f"{velocity:.2f}")
-
+        self.system_curve = self.system_input_widget.get_system_curve()
         
-    def formatar_item_lista(self, pump: Dict[str, Any]) -> tuple[str, str]:
+        self.target_flow = self.system_input_widget.get_target_flow()
+        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        
+        # Atualizar campos na interface
+        if self.target_flow is not None:
+            self.system_target_flow.setText(f"{self.target_flow:.2f} m³/h")
+            
+            # Calcular o head no ponto de operação
+            if self.system_curve is not None:
+                head_valor = np.polyval(self.system_curve, self.target_flow)
+                self.system_head.setText(f"{head_valor:.2f} m")
+        
+        if npsh_disponivel is not None:
+            self.system_npsh_disponivel.setText(f"{npsh_disponivel:.2f} m")
+        
+        # Calcular vazão por bomba (depende do número de bombas)
+        n_bombas = int(self.combo_n_bombas.currentText())
+        if self.target_flow is not None:
+            vazao_por_bomba = self.target_flow / n_bombas
+            self.vazao_por_bomba.setText(f"{vazao_por_bomba:.2f} m³/h")
+        
+        # Habilitar o botão de seleção de bomba
+        self.btn_selecionar_bomba.setEnabled(True)
+        
+        # Atualizar o gráfico para o número atual de bombas em paralelo
+        self.atualizar_grafico_bombas_paralelo()
+    
+    # Adicionar função para atualizar bombas quando o número de bombas é alterado
+    def atualizar_grafico_bombas_paralelo(self):
+        """
+        Atualiza o gráfico quando o número de bombas em paralelo é alterado.
+        Limpa a seleção de bombas atual e exibe apenas a curva do sistema.
+        """
+        # Verificar se temos dados do sistema
+        if self.system_curve is None or self.target_flow is None:
+            return
+            
+        # Obter o número de bombas em paralelo
+        n_bombas = int(self.combo_n_bombas.currentText())
+        
+        # Calcular a vazão por bomba
+        vazao_por_bomba = self.target_flow / n_bombas
+        
+        # Atualizar os campos de texto
+        self.system_target_flow.setText(f"{self.target_flow:.2f} m³/h (total para {n_bombas} bomba{'s' if n_bombas > 1 else ''})")
+        self.vazao_por_bomba.setText(f"{vazao_por_bomba:.2f} m³/h por bomba")
+        
+        # Ajustar a curva do sistema para o número atual de bombas
+        self.system_curve_adjusted = self.adjust_system_curve_for_parallel_pumps(self.system_curve, n_bombas)
+        
+        # NOVA FUNCIONALIDADE: Limpar a seleção atual
+        
+        # Limpar a lista de bombas
+        self.list_widget.clear()
+        self.pumps = []
+        self.selected_pump_index = None
+        
+        # Limpar os campos de informação da bomba
+        self.result_flow.setText("")
+        self.result_head.setText("")
+        self.result_pump.setText("")
+        self.result_eff.setText("")
+        self.result_power.setText("")
+        self.result_npsh.setText("")
+        self.result_rotor_diametro.setText("")
+        self.result_npsh_comparison.setText("")
+        
+        # Criar flow_values para o gráfico
+        flow_values = np.linspace(0, self.target_flow * 1.4, 500)
+        
+        # Mostrar apenas a curva do sistema (sem bomba selecionada)
+        self.atualizar_plot(flow_values, self.system_curve)
+        
+    
+    def formatar_item_lista(self, pump: Dict[str, Any]) -> tuple:
         """
         Formata o texto do item e o tooltip a partir dos dados da bomba.
+        Trata cuidadosamente a estrutura de 'intersecoes' para evitar erros.
+        Considera o número de bombas em paralelo.
         """
-        # Valor de vazão de operação, com validação do campo 'intersecoes'
+        # Obter o número de bombas em paralelo
+        n_bombas = int(self.combo_n_bombas.currentText())
+        
+        # Valor de vazão de operação, com validação e tratamento de erros
         try:
-            operacao_vazao = pump['intersecoes'][0][0]
-        except (KeyError, IndexError):
-            operacao_vazao = 0.0
+            # Verificar a estrutura de intersecoes e obter o valor de vazão (por bomba)
+            intersecoes = pump.get('intersecoes', [[0.0, 0.0]])
+            if isinstance(intersecoes, list) and len(intersecoes) > 0:
+                if isinstance(intersecoes[0], list) and len(intersecoes[0]) > 0:
+                    vazao_bomba = intersecoes[0][0]  # Estrutura: [[x, y], ...]
+                else:
+                    vazao_bomba = intersecoes[0]  # Estrutura: [x, y, ...]
+            else:
+                vazao_bomba = 0.0
+                
+            # Verificar se temos a vazão total do sistema pré-calculada
+            if 'system_flow_total' in pump:
+                vazao_total = pump['system_flow_total']
+            else:
+                vazao_total = vazao_bomba * n_bombas
+                
+        except (IndexError, TypeError):
+            vazao_bomba = 0.0
+            vazao_total = 0.0
+            print(f"Erro ao acessar estrutura de interseções: {pump.get('intersecoes')}")
 
         item_text = (f"Marca: {pump.get('marca', 'N/D')}, Modelo: {pump.get('modelo', 'N/D')}, "
-                     f"Diâmetro: {pump.get('diametro', 'N/D')}, Rotação: {pump.get('rotacao', 'N/D')}, "
-                     f"Eff.: {pump.get('pump_eff', 0):.2f}")
-        tooltip_text = (f"Vazão: {operacao_vazao:.2f} m³/h\n"
+                    f"Diâmetro: {pump.get('diametro', 'N/D')}, Rotação: {pump.get('rotacao', 'N/D')}, "
+                    f"Eff.: {pump.get('pump_eff', 0):.2f}%")
+        
+        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        margem_npsh = npsh_disponivel - pump.get('pump_npshr', 0) if npsh_disponivel is not None else 0
+        
+        tooltip_text = (f"Vazão Total: {vazao_total:.2f} m³/h\n"
+                        f"Vazão por Bomba: {vazao_bomba:.2f} m³/h\n"
                         f"Rotação: {pump.get('rotacao', 'N/D')} rpm\n"
                         f"NPSHr: {pump.get('pump_npshr', 0):.1f} m\n"
-                        f"Potência: {pump.get('pump_power', 0):.1f} cv")
+                        f"Potência: {pump.get('pump_power', 0):.1f} cv (por bomba)\n"
+                        f"Potência Total: {pump.get('pump_power', 0) * n_bombas:.1f} cv ({n_bombas} bombas)\n"
+                        f"NPSH Disponível: {npsh_disponivel:.1f} m\n"
+                        f"Margem de NPSH: {margem_npsh:.1f} m\n"
+                        f"Bombas em Paralelo: {n_bombas}")
+        
         return item_text, tooltip_text
+
 
     def selecionar_bomba(self) -> None:
         """
-        Executa o cálculo do sistema, chama auto_pump_selection e atualiza a lista com os resultados.
-        O target_flow é obtido a partir do campo de vazão.
-        Ordena as bombas pela proximidade do ponto de operação (vazão de interseção) com o target_flow.
+        Executa a seleção de bombas com base nos dados do sistema calculados previamente.
+        Considera o número de bombas em paralelo para a seleção.
+        Filtra as bombas que não atendem ao critério de NPSH.
         """
-        self.system_curve, self.target_flow = self.calcular_sistema()
+        # Verificar se os dados do sistema estão disponíveis
         if self.system_curve is None or self.target_flow is None:
-            logging.error("Parâmetros do sistema não definidos.")
+            QMessageBox.warning(
+                self, 
+                "Aviso", 
+                "É necessário calcular o sistema primeiro. Vá para a aba 'Sistema' e clique em 'Calcular Curva do Sistema'."
+            )
             return
-
-        pumps = auto_pump_selection(self.system_curve, self.target_flow)
-        logging.info(f"Bombas selecionadas: {pumps}")
+        
+        # Obter o NPSH disponível
+        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        if npsh_disponivel is None or npsh_disponivel <= 0:
+            QMessageBox.critical(self, "Erro", "NPSH disponível não calculado ou inválido.")
+            return
+        
+        # Obter o número de bombas em paralelo
+        n_bombas = int(self.combo_n_bombas.currentText())
+        
+        # Ajustar a vazão alvo para o número de bombas em paralelo
+        # Cada bomba precisará fornecer apenas uma fração da vazão total
+        vazao_por_bomba = self.target_flow / n_bombas
+        
+        logging.info(f"NPSH disponível utilizado: {npsh_disponivel:.2f} m")
+        logging.info(f"Número de bombas em paralelo: {n_bombas}")
+        logging.info(f"Vazão total do sistema: {self.target_flow:.2f} m³/h")
+        logging.info(f"Vazão alvo por bomba: {vazao_por_bomba:.2f} m³/h")
+        
+        # Criar uma curva de sistema ajustada para o número de bombas em paralelo
+        # Usamos uma abordagem baseada em amostras de pontos
+        
+        system_curve_adjusted = self.adjust_system_curve_for_parallel_pumps(self.system_curve, n_bombas)
+        self.system_curve_adjusted = system_curve_adjusted  # Armazenar para uso posterior
+        # Selecionar bombas usando a curva ajustada e a vazão por bomba
+        pumps = auto_pump_selection(system_curve_adjusted, vazao_por_bomba)
+        logging.info(f"Bombas selecionadas antes do filtro NPSH: {len(pumps) if isinstance(pumps, list) else 0}")
+        
         self.list_widget.clear()
+        self.selected_pump_index = None
+        
 
         if isinstance(pumps, str):
             self.list_widget.addItem(pumps)
             self.pumps = []
-        elif pumps:
-            # Ordena as bombas pela proximidade do ponto de interseção com o target_flow,
-            # garantindo que a bomba com a vazão de operação mais próxima do target apareça primeiro.
-            try:
-                pumps_sorted = sorted(
-                    pumps,
-                    key=lambda p: abs(p.get('intersecoes', [[self.target_flow]])[0][0] - self.target_flow)
-                )
-            except Exception as e:
-                logging.error(f"Erro ao ordenar bombas: {e}")
-                pumps_sorted = pumps
+            return
+        
+        # Filtrar bombas com base no critério NPSH
+        pumps_filtered = []
+        filtered_out_count = 0
+        
+        for pump in pumps:
+            # Verificar se o NPSH requerido da bomba é menor que o NPSH disponível
+            if pump['pump_npshr'] < npsh_disponivel:
+                # Calcular a vazão total do sistema para esta bomba
+                try:
+                    # Obter a vazão do ponto de interseção (vazão por bomba) e o head correspondente
+                    intersecoes = pump.get('intersecoes', [[0.0, 0.0]])
+                    if isinstance(intersecoes, list) and len(intersecoes) > 0:
+                        if isinstance(intersecoes[0], list) and len(intersecoes[0]) > 0:
+                            vazao_bomba = intersecoes[0][0]
+                            head_value = intersecoes[0][1] if len(intersecoes[0]) > 1 else np.polyval(system_curve_adjusted, vazao_bomba)
+                        else:
+                            vazao_bomba = intersecoes[0]
+                            head_value = intersecoes[1] if len(intersecoes) > 1 else np.polyval(system_curve_adjusted, vazao_bomba)
+                    else:
+                        vazao_bomba = 0.0
+                        head_value = 0.0
+                    
+                    # Calcular a vazão total do sistema (vazão por bomba * número de bombas)
+                    vazao_total = vazao_bomba * n_bombas
+                    
+                    # Armazenar os valores calculados para uso posterior
+                    pump['vazao_bomba'] = vazao_bomba
+                    pump['vazao_total'] = vazao_total
+                    pump['head_value'] = head_value
+                    
+                    # Criar um ponto de interseção próprio para este número de bombas
+                    pump['ponto_intersecao'] = [vazao_bomba, head_value]
+                    
+                except Exception as e:
+                    print(f"Erro ao processar interseções: {e}")
+                    # Em caso de erro, adiciona valores padrão
+                    pump['vazao_bomba'] = vazao_por_bomba
+                    pump['vazao_total'] = vazao_por_bomba * n_bombas
+                    pump['head_value'] = np.polyval(system_curve_adjusted, vazao_por_bomba)
+                    pump['ponto_intersecao'] = [vazao_por_bomba, pump['head_value']]
+                    
+                pumps_filtered.append(pump)
+            else:
+                filtered_out_count += 1
+                logging.info(f"Bomba filtrada por NPSH: {pump['marca']} {pump['modelo']} - "
+                            f"NPSHr: {pump['pump_npshr']:.2f} m > NPSHd: {npsh_disponivel:.2f} m")
+        
+        logging.info(f"Bombas removidas pelo filtro NPSH: {filtered_out_count}")
+        
+        if not pumps_filtered:
+            self.list_widget.addItem("Nenhuma bomba atende ao critério de NPSH disponível.")
+            self.pumps = []
+            return
+        
+        # Ordenar bombas pela proximidade ao target_flow (vazão por bomba)
+        try:
+            pumps_sorted = sorted(
+                pumps_filtered,
+                key=lambda p: abs(p.get('vazao_bomba', 0) - vazao_por_bomba)
+            )
+        except Exception as e:
+            logging.error(f"Erro ao ordenar bombas: {e}")
+            pumps_sorted = pumps_filtered
+        
+        self.pumps = pumps_sorted
+        
+        # Adicionar as bombas filtradas e ordenadas à lista
+        for pump in self.pumps:
+            item_text, tooltip_text = self.formatar_item_lista(pump)
+            list_item = QListWidgetItem(item_text)
+            list_item.setToolTip(tooltip_text)
+            self.list_widget.addItem(list_item)
+        
+        # Atualizar o estilo da lista
+        self.list_widget.setStyleSheet("QListWidget::item:selected { background-color: lightblue; }")
+        
 
-            self.pumps = pumps_sorted
-            for pump in self.pumps:
-                item_text, tooltip_text = self.formatar_item_lista(pump)
-                list_item = QListWidgetItem(item_text)
-                list_item.setToolTip(tooltip_text)
-                self.list_widget.addItem(list_item)
-            self.list_widget.setStyleSheet("QListWidget::item:selected { background-color: lightblue; }")
+    def adjust_system_curve_for_parallel_pumps(self, original_curve, n_bombas):
+        """
+        Ajusta a curva do sistema para considerar bombas em paralelo.
+        
+        Gera um conjunto de pontos a partir da curva original,
+        divide os valores de vazão (eixo x) pelo número de bombas,
+        e realiza um novo ajuste polinomial de grau 5.
+        
+        Parâmetros:
+            original_curve: coeficientes da curva do sistema original
+            n_bombas: número de bombas em paralelo
+            
+        Retorna:
+            Novos coeficientes para a curva ajustada
+        """
+
+        
+        # Determinar um intervalo apropriado para os valores de vazão
+        # Usar o valor máximo de vazão do sistema e adicionar uma margem
+        if hasattr(self, 'target_flow') and self.target_flow is not None:
+            max_flow = self.target_flow * 1.4  # Usar o mesmo fator que é usado em outras partes do código
         else:
-            self.list_widget.addItem("Nenhuma bomba encontrada.")
-
-
+            max_flow = 100.0  # Valor padrão se não houver informação disponível
+        
+        # Gerar conjunto de 100 valores de vazão (eixo x)
+        x_original = np.linspace(0.001, max_flow, 100)  # Evitando o zero para prevenir divisão por zero
+        
+        # Calcular os valores de head correspondentes usando a curva original
+        y_original = np.polyval(original_curve, x_original)
+        
+        # Ajustar os valores de vazão dividindo pelo número de bombas
+        x_adjusted = x_original / n_bombas
+        
+        # Realizar um novo ajuste polinomial de grau 5 para os pontos ajustados
+        adjusted_curve = np.polyfit(x_adjusted, y_original, 5)
+        
+        return adjusted_curve
     
     def abrir_curve_input_dialog(self):
         dialog = CurveInputDialog(self)
         dialog.exec()
     
     def atualizar_plot(self, flow_values, system_head_values_coef, pump_head_coef_values=None, pump_vazao_min=None, pump_vazao_max=None, intersection_point=None):
-        self.ax.clear()
-        system_head_values = np.polyval(system_head_values_coef, flow_values)
-        self.ax.plot(flow_values, system_head_values, linestyle='-', label='Curva do Sistema')
-        if pump_head_coef_values is not None:
-            pump_flow_values = np.linspace(pump_vazao_min, pump_vazao_max, 500)
-            pump_head_values = np.polyval(pump_head_coef_values, pump_flow_values)
-            self.ax.plot(pump_flow_values, pump_head_values, linestyle='--', label='Curva da Bomba')
-            if intersection_point is not None:
-                self.ax.plot(intersection_point[0], intersection_point[1], 'ro', label='Intersecção')
-        self.ax.set_xlabel("Flow (m³/h)")
-        self.ax.set_ylabel("Head")
-        self.ax.set_title("Curva do Sistema x Curva da Bomba")
-        self.ax.legend()
-            # Configura o limite inferior do eixo y para 0
-        self.ax.set_ylim(bottom=0)
-        self.canvas.draw()
-    
-    def calcular_sistema(self):
         """
-        Executa o cálculo do sistema utilizando os valores dos widgets injetados,
-        plota o ajuste polinomial e retorna os parâmetros (system_curve e target_flow)
-        para a seleção automática de bomba.
-        O target_flow é obtido a partir do campo de vazão.
+        Atualiza o gráfico com as curvas do sistema e da bomba.
+        Usa o ponto de interseção atualizado.
         """
-
-        
-        spinbox_suction = self.system_input_widget.get_spinbox_values_suction()
-        suction_size = self.combo_diametro_pipe.currentText()
-        spinbox_discharge = self.system_input_widget.get_spinbox_values_discharge()
-        discharge_size = self.combo_diametro_pipe.currentText()
-        mu_value = self.fluid_prop_input_widget.get_mu_input_value()
-        rho_value = self.fluid_prop_input_widget.get_rho_input_value()
-        roughness = self.fluid_prop_input_widget.get_roughness_value() ## Obtém o valor de rugosidade do tubo em mm
-        
-        target_flow = self.get_target_flow()
-        if target_flow is None:
-            return None, None
-        
-        head_values_coef, min_flow, max_flow = calculate_pipe_system_head_loss(
-            spinbox_suction, suction_size,
-            spinbox_discharge, discharge_size,
-            target_flow, mu_value, rho_value, roughness/1000 # Converte rugosidade de mm para m
-        )
-        
-        flow_values = np.linspace(min_flow, max_flow, 500)
-        self.flow_values = flow_values
-        self.atualizar_plot(flow_values, head_values_coef)
-        print("O cálculo do sistema foi feito com ajuste polinomial (linha contínua)!")
-        
-        self.system_curve = head_values_coef
-        self.target_flow = target_flow
-        return head_values_coef, target_flow
-        
-    def get_target_flow(self):
         try:
-            # Utiliza o valor da vazão como target_flow
-            return float(self.line_edit_vazao.text())
-        except ValueError:
-            QMessageBox.critical(self, "Erro", "Insira o valor da Vazão corretamente!")
-            return None
-    
+            self.ax.clear()
+            
+            # Obter o número de bombas em paralelo
+            n_bombas = int(self.combo_n_bombas.currentText())
+            
+            # Plotar a curva do sistema 
+            if system_head_values_coef is not None:
+                # Gerar vazões para o eixo X, com passo adequado
+                system_flow_values = np.linspace(0.001, max(flow_values) * 1.1, 500)
+                
+                # Calcular heads para a curva do sistema original (vazão total)
+                system_head_values = np.polyval(system_head_values_coef, system_flow_values)
+                
+                # Dividir vazões pelo número de bombas para plotagem
+                system_flow_values_ajustado = system_flow_values / n_bombas
+                
+                # Plotar curva do sistema
+                self.ax.plot(system_flow_values_ajustado, system_head_values, 
+                            linestyle='-', color='blue', linewidth=2, 
+                            label='Curva do Sistema')
+            
+            # Plotar curva da bomba
+            if pump_head_coef_values is not None and pump_vazao_min is not None and pump_vazao_max is not None:
+                # Gerar valores para curva da bomba
+                pump_flow_values = np.linspace(pump_vazao_min, pump_vazao_max, 500)
+                pump_head_values = np.polyval(pump_head_coef_values, pump_flow_values)
+                
+                # Plotar curva da bomba
+                self.ax.plot(pump_flow_values, pump_head_values, 
+                            linestyle='--', color='green', linewidth=2, 
+                            label='Curva da Bomba')
+                
+                # Plotar ponto de interseção
+                if intersection_point is not None:
+                    try:
+                        # Se estamos na função on_item_double_clicked, intersection_point 
+                        # será o valor armazenado em pump['ponto_intersecao']
+                        # que já foi calculado corretamente para o número atual de bombas
+                        if isinstance(intersection_point, list) and len(intersection_point) >= 2:
+                            x, y = intersection_point[0], intersection_point[1]
+                            
+                            # Marcar o ponto de interseção no gráfico
+                            self.ax.plot(x, y, 'ro', markersize=8, label='Ponto de Operação')
+                            
+                            # Adicionar linhas tracejadas até os eixos
+                            self.ax.axhline(y=y, color='r', linestyle=':', alpha=0.5)
+                            self.ax.axvline(x=x, color='r', linestyle=':', alpha=0.5)
+                            
+                            # Opcional: Adicionar texto com o valor do ponto
+                            self.ax.annotate(f'({x:.1f}, {y:.1f})', 
+                                            xy=(x, y), 
+                                            xytext=(10, 10),
+                                            textcoords='offset points',
+                                            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5))
+                        
+                    except Exception as e:
+                        print(f"Erro ao plotar ponto de interseção: {e}")
+            
+            # Configurações do gráfico
+            self.ax.set_xlabel("Vazão por Bomba (m³/h)")
+            self.ax.set_ylabel("Head (m)")
+            self.ax.set_title(f"Curva do Sistema x Curva da Bomba ({n_bombas} bomba{'s' if n_bombas > 1 else ''} em paralelo)")
+            self.ax.legend(loc='best')
+            self.ax.set_ylim(bottom=0)  # Limite inferior do eixo y para 0
+            self.ax.grid(True, linestyle='--', alpha=0.7)
+            self.canvas.draw()
+            
+        except Exception as e:
+            print(f"Erro ao atualizar o gráfico: {e}")
+
+            
     def on_item_double_clicked(self, item):
         """
         Ao dar duplo clique em um item da lista, atualiza os campos do grupo Dados da Bomba.
+        Usa os dados de interseção já calculados para o número atual de bombas.
         """
         index = self.list_widget.row(item)
+        self.selected_pump_index = index  # Armazenar o índice da bomba selecionada
+        
         try:
             pump = self.pumps[index]
         except IndexError:
             print("Índice inválido no array de bombas.")
             return
 
-        # Formatação dos números com vírgula como separador decimal
-        flow_str = f"{pump['intersecoes'][0][0]:.2f}".replace('.', ',')
-        head_value = np.polyval(self.system_curve, pump['intersecoes'][0][0])
-        head_str = f"{head_value:.2f}".replace('.', ',')
-        eff_str = f"{pump['pump_eff']:.2f}".replace('.', ',')
-        power_str = f"{pump['pump_power']:.2f}".replace('.', ',')
-        npsh_str = f"{pump['pump_npshr']:.2f}".replace('.', ',')
+        # Obter o número de bombas em paralelo
+        n_bombas = int(self.combo_n_bombas.currentText())
 
-        self.result_flow.setText(flow_str + " m³/h")
-        self.result_head.setText(head_str)
-        self.result_pump.setText(f"{pump['marca']} / {pump['modelo']}")
+        # Usar os valores já calculados e armazenados na bomba
+        vazao_bomba = pump.get('vazao_bomba', 0.0)
+        vazao_total = pump.get('vazao_total', 0.0)
+        head_value = pump.get('head_value', 0.0)
+        
+        # Se os valores não estiverem pré-calculados (improvável com as alterações),
+        # calcular a partir do início
+        if vazao_bomba == 0.0 or vazao_total == 0.0 or head_value == 0.0:
+            try:
+                # Recalcular usando intersecoes originais
+                intersecoes = pump.get('intersecoes', [[0.0, 0.0]])
+                if isinstance(intersecoes, list) and len(intersecoes) > 0:
+                    if isinstance(intersecoes[0], list) and len(intersecoes[0]) > 0:
+                        vazao_bomba = intersecoes[0][0]
+                        head_value = intersecoes[0][1] if len(intersecoes[0]) > 1 else np.polyval(self.system_curve_adjusted, vazao_bomba)
+                    else:
+                        vazao_bomba = intersecoes[0]
+                        head_value = intersecoes[1] if len(intersecoes) > 1 else np.polyval(self.system_curve_adjusted, vazao_bomba)
+                
+                vazao_total = vazao_bomba * n_bombas
+                
+                # Armazenar os valores calculados
+                pump['vazao_bomba'] = vazao_bomba
+                pump['vazao_total'] = vazao_total
+                pump['head_value'] = head_value
+                pump['ponto_intersecao'] = [vazao_bomba, head_value]
+                
+            except Exception as e:
+                print(f"Erro ao recalcular ponto de operação: {e}")
+                vazao_bomba = self.target_flow / n_bombas
+                vazao_total = self.target_flow
+                head_value = np.polyval(self.system_curve, vazao_total)
+
+        # Formatação dos números com vírgula como separador decimal
+        flow_total_str = f"{vazao_total:.2f}".replace('.', ',')
+        flow_bomba_str = f"{vazao_bomba:.2f}".replace('.', ',')
+        head_str = f"{head_value:.2f}".replace('.', ',')
+        
+        eff_str = f"{pump.get('pump_eff', 0):.2f}".replace('.', ',')
+        power_per_pump_str = f"{pump.get('pump_power', 0):.2f}".replace('.', ',')
+        power_total_str = f"{pump.get('pump_power', 0) * n_bombas:.2f}".replace('.', ',')
+        npsh_str = f"{pump.get('pump_npshr', 0):.2f}".replace('.', ',')
+
+        # Atualizar os campos de informação
+        self.result_flow.setText(f"{flow_total_str} m³/h total ({flow_bomba_str} m³/h por bomba)")
+        self.result_head.setText(head_str + " m")
+        self.result_pump.setText(f"{pump.get('marca', 'N/D')} / {pump.get('modelo', 'N/D')}")
         self.result_eff.setText(eff_str + "%")
-        self.result_power.setText(power_str + " cv")
+        self.result_power.setText(f"{power_per_pump_str} cv por bomba ({power_total_str} cv total)")
         self.result_npsh.setText(npsh_str + " m")
         
-        # Atualiza o novo campo com o diâmetro do rotor
-        self.result_rotor_diametro.setText(pump['diametro'])
+        # Atualiza o campo com o diâmetro do rotor
+        self.result_rotor_diametro.setText(f"{pump.get('diametro', 'N/D')} mm")
 
-        # Exibe os dados da bomba selecionada no console
-        print(f"Selecionada Bomba -> Marca: {pump['marca']}, Modelo: {pump['modelo']}, "
-            f"Diâmetro: {pump['diametro']}, Rotação: {pump['rotacao']}")
+        # Calcular e exibir a margem de NPSH
+        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        npsh_requerido = pump.get('pump_npshr', 0)
+        if npsh_disponivel is not None:
+            margem_npsh = npsh_disponivel - npsh_requerido
+            margem_str = f"{margem_npsh:.2f}".replace('.', ',')
 
-        pump_head_coef_values = pump.get('pump_coef_head')
-        intersection_points = pump.get('intersecoes')
-        pump_vazao_min = pump.get('pump_vazao_min')
-        pump_vazao_max = pump.get('pump_vazao_max')
-        pump_flow_values = np.linspace(pump_vazao_min, pump_vazao_max, 500)
-        # Atualiza o gráfico com a curva do sistema e a curva da bomba (e o(s) ponto(s) de interseção, se disponível)
-        self.atualizar_plot(pump_flow_values, self.system_curve, pump_head_coef_values, pump_vazao_min, pump_vazao_max, intersection_points)
+            # Colorir o campo de acordo com a margem
+            if margem_npsh < 0.5:
+                self.result_npsh_comparison.setStyleSheet("background-color: #ffcccc;")  # Vermelho claro
+            elif margem_npsh < 1.0:
+                self.result_npsh_comparison.setStyleSheet("background-color: #ffffcc;")  # Amarelo claro
+            else:
+                self.result_npsh_comparison.setStyleSheet("background-color: #ccffcc;")  # Verde claro
 
+            self.result_npsh_comparison.setText(margem_str + " m")
+        else:
+            self.result_npsh_comparison.setText("N/D")
+
+        # Atualizar o gráfico com a curva do sistema, curva da bomba e ponto de interseção
+        try:
+            pump_head_coef_values = pump.get('pump_coef_head')
+            pump_vazao_min = pump.get('pump_vazao_min', 0)
+            pump_vazao_max = pump.get('pump_vazao_max', 100)
+            
+            # Usar o ponto de interseção corretamente calculado
+            intersection_point = pump.get('ponto_intersecao', [vazao_bomba, head_value])
+            
+            # Atualiza o gráfico com a curva do sistema e a curva da bomba
+            flow_values = np.linspace(0, max(pump_vazao_max, self.target_flow * 1.4), 500)
+            self.atualizar_plot(flow_values, self.system_curve, pump_head_coef_values, 
+                            pump_vazao_min, pump_vazao_max, intersection_point)
+        except Exception as e:
+            print(f"Erro ao atualizar o gráfico: {e}")
 
 
 if __name__ == '__main__':

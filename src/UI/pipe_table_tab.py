@@ -2,22 +2,37 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
-    QDoubleSpinBox, QSpinBox, QComboBox, QGroupBox
+    QDoubleSpinBox, QSpinBox, QComboBox, QGroupBox,
+    QPushButton, QLineEdit, QMessageBox
 )
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QDoubleValidator
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from UI.data.input_variables import *
+from UI.extra.local_loss import size_dict_internal_diameter_sch40
+from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
+import numpy as np
 import pandas as pd
 
 
 class SystemInputWidget(QWidget):
+    # Sinal para indicar que o cálculo foi concluído
+    calculoCompleto = pyqtSignal()
+    
     def __init__(self):
         super().__init__()
         
         # Inicializa as listas de spinboxes antes de usar
         self.quantity_suction = []
         self.quantity_discharge = []
+        
+        # Armazenamento de resultados calculados
+        self.system_curve = None
+        self.flow_values = None
+        self.target_flow = None
+        self.suction_friction_loss = None
+        self.suction_height = None
+        self.npsh_disponivel = None
 
         # Cria os widgets principais
         suction_group = self._create_group_box("Sucção")
@@ -28,14 +43,47 @@ class SystemInputWidget(QWidget):
         self._setup_input_layout(suction_group, is_suction=True)
         self._setup_input_layout(discharge_group, is_suction=False)
 
-        # Removendo restrições fixas de largura para permitir que 
-        # o layout com proporções funcione corretamente
-
-        # Configura layout principal com proporções 3:6:3 (total 12 partes)
-        main_layout = QHBoxLayout()
-        main_layout.addWidget(suction_group, 3)
-        main_layout.addWidget(middle_box, 6)
-        main_layout.addWidget(discharge_group, 3)
+        # Configura layout principal
+        main_layout = QVBoxLayout()
+        
+        # Adiciona grupo de vazão global (acima de tudo)
+        flow_group = QGroupBox("Parâmetros do Sistema")
+        flow_layout = QVBoxLayout()
+        
+        # Campo de Vazão (unificado)
+        vazao_layout = QHBoxLayout()
+        label_vazao = QLabel("Vazão (m³/h):")
+        vazao_layout.addWidget(label_vazao)
+        
+        self.line_edit_vazao = QLineEdit()
+        self.line_edit_vazao.setValidator(QDoubleValidator(0.0, 1e9, 2, self))
+        self.line_edit_vazao.setPlaceholderText("Informe a vazão do sistema")
+        self.line_edit_vazao.textChanged.connect(self.atualizar_velocidades)
+        vazao_layout.addWidget(self.line_edit_vazao)
+        
+        flow_layout.addLayout(vazao_layout)
+        flow_group.setLayout(flow_layout)
+        main_layout.addWidget(flow_group)
+        
+        # Layout para os grupos de sucção, meio e recalque
+        groups_layout = QHBoxLayout()
+        groups_layout.addWidget(suction_group, 3)
+        groups_layout.addWidget(middle_box, 6)
+        groups_layout.addWidget(discharge_group, 3)
+        
+        main_layout.addLayout(groups_layout)
+        
+        # Adiciona o botão Calcular
+        calculate_button_layout = QHBoxLayout()
+        self.calculate_button = QPushButton("Calcular Curva do Sistema")
+        self.calculate_button.setFixedHeight(40)
+        self.calculate_button.setStyleSheet("font-weight: bold;")
+        self.calculate_button.clicked.connect(self.calcular_sistema)
+        calculate_button_layout.addStretch()
+        calculate_button_layout.addWidget(self.calculate_button)
+        calculate_button_layout.addStretch()
+        
+        main_layout.addLayout(calculate_button_layout)
         
         self.setLayout(main_layout)
 
@@ -74,36 +122,121 @@ class SystemInputWidget(QWidget):
         
         # Valores iniciais para testes
         input_values_suction = {
-            "Trecho Retilineo": 6, "Diferença de Altura": 2, 
-            "Cotovelo 90° Raio Longo": 0, "Cotovelo 90° Raio Médio": 0, "Cotovelo 90° Raio Curto": 0,
-            "Cotovelo 45°": 0, "Curva 90° Raio Longo": 5, "Curva 90° Raio Curto": 0, "Curva 45°": 4, 
-            "Entrada Normal": 0, "Entrada de Borda": 1, "Válvula Gaveta Aberta": 3, 
-            "Válvula Globo Aberta": 0, "Válvula Ângular Aberta": 0, "Passagem Reta Tê": 0,
-            "Derivação Tê": 0, "Bifurcação Tê": 0, "Válvula de Pé e Crivo": 1, 
-            "Saída de Canalização": 1, "Válvula de Retenção Leve": 0, "Válvula de Retenção Pesado": 1
+            "Trecho Retilineo": 10,  # metros
+            "Diferença de Altura": 2,  # metros
+            "Cotovelo 90° Raio Longo": 1,  # quantidade
+            "Cotovelo 90° Raio Médio": 0, 
+            "Cotovelo 90° Raio Curto": 0,
+            "Cotovelo 45°": 0, 
+            "Curva 90° Raio Longo": 0, 
+            "Curva 90° Raio Curto": 0, 
+            "Curva 45°": 0, 
+            "Entrada Normal": 0, 
+            "Entrada de Borda": 0, 
+            "Válvula Gaveta Aberta": 0, 
+            "Válvula Globo Aberta": 0, 
+            "Válvula Ângular Aberta": 0, 
+            "Passagem Reta Tê": 0,
+            "Derivação Tê": 0, 
+            "Bifurcação Tê": 0, 
+            "Válvula de Pé e Crivo": 1,  # quantidade
+            "Saída de Canalização": 0, 
+            "Válvula de Retenção Leve": 0, 
+            "Válvula de Retenção Pesado": 0
         }
 
         input_values_discharge = {
-            "Trecho Retilineo": 50, "Diferença de Altura": 8, 
-            "Cotovelo 90° Raio Longo": 0, "Cotovelo 90° Raio Médio": 0, "Cotovelo 90° Raio Curto": 0,
-            "Cotovelo 45°": 0, "Curva 90° Raio Longo": 5, "Curva 90° Raio Curto": 0, "Curva 45°": 4, 
-            "Entrada Normal": 0, "Entrada de Borda": 1, "Válvula Gaveta Aberta": 3, 
-            "Válvula Globo Aberta": 0, "Válvula Ângular Aberta": 0, "Passagem Reta Tê": 0,
-            "Derivação Tê": 0, "Bifurcação Tê": 0, "Válvula de Pé e Crivo": 1, 
-            "Saída de Canalização": 1, "Válvula de Retenção Leve": 0, "Válvula de Retenção Pesado": 1
+            "Trecho Retilineo": 2840,  # metros
+            "Diferença de Altura": 8,  # metros estimados
+            "Cotovelo 90° Raio Longo": 0, 
+            "Cotovelo 90° Raio Médio": 0, 
+            "Cotovelo 90° Raio Curto": 0,
+            "Cotovelo 45°": 0, 
+            "Curva 90° Raio Longo": 0, 
+            "Curva 90° Raio Curto": 0, 
+            "Curva 45°": 0, 
+            "Entrada Normal": 0, 
+            "Entrada de Borda": 0, 
+            "Válvula Gaveta Aberta": 0, 
+            "Válvula Globo Aberta": 1,  # registro de globo aberto
+            "Válvula Ângular Aberta": 0, 
+            "Passagem Reta Tê": 0,
+            "Derivação Tê": 0, 
+            "Bifurcação Tê": 0, 
+            "Válvula de Pé e Crivo": 0, 
+            "Saída de Canalização": 1,  # quantidade
+            "Válvula de Retenção Leve": 0, 
+            "Válvula de Retenção Pesado": 1  # válvula de retenção
         }
         
         # Seleciona os valores apropriados baseado no tipo de entrada
         input_values = input_values_suction if is_suction else input_values_discharge
         
-        # As listas já foram inicializadas no __init__
-            
         # Cria layout para o grupo com alinhamento ao topo
         group_layout = QVBoxLayout()
         group_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         group_layout.setSpacing(5)  # Menor espaçamento entre itens
         
-        # Adiciona cabeçalho com mesma proporção dos itens (2:1)
+        # Configuração para Diâmetro e Velocidade
+        params_group = QGroupBox("Parâmetros")
+        params_layout = QVBoxLayout()
+        
+        # Campo de Diâmetro
+        diametro_layout = QHBoxLayout()
+        label_diametro = QLabel("Diâmetro:")
+        diametro_layout.addWidget(label_diametro)
+        
+        if is_suction:
+            self.combo_diametro_suction = QComboBox()
+            self.combo_diametro_suction.addItems(list(size_dict_internal_diameter_sch40.keys()))
+            self.combo_diametro_suction.currentIndexChanged.connect(lambda: self.atualizar_velocidade("suction"))
+            diametro_layout.addWidget(self.combo_diametro_suction)
+        else:
+            self.combo_diametro_discharge = QComboBox()
+            self.combo_diametro_discharge.addItems(list(size_dict_internal_diameter_sch40.keys()))
+            self.combo_diametro_discharge.currentIndexChanged.connect(lambda: self.atualizar_velocidade("discharge"))
+            diametro_layout.addWidget(self.combo_diametro_discharge)
+        
+        params_layout.addLayout(diametro_layout)
+        
+        # Campo de Velocidade
+        velocidade_layout = QHBoxLayout()
+        label_velocidade = QLabel("Velocidade (m/s):")
+        velocidade_layout.addWidget(label_velocidade)
+        
+        if is_suction:
+            self.line_edit_velocity_suction = QLineEdit()
+            self.line_edit_velocity_suction.setReadOnly(True)
+            self.line_edit_velocity_suction.setPlaceholderText("Calculado automaticamente")
+            velocidade_layout.addWidget(self.line_edit_velocity_suction)
+        else:
+            self.line_edit_velocity_discharge = QLineEdit()
+            self.line_edit_velocity_discharge.setReadOnly(True)
+            self.line_edit_velocity_discharge.setPlaceholderText("Calculado automaticamente")
+            velocidade_layout.addWidget(self.line_edit_velocity_discharge)
+        
+        params_layout.addLayout(velocidade_layout)
+        
+        # Se for sucção, adiciona campo de NPSH disponível
+        if is_suction:
+            npsh_layout = QHBoxLayout()
+            label_npsh = QLabel("NPSH Disponível (m):")
+            npsh_layout.addWidget(label_npsh)
+            
+            self.line_edit_npsh = QLineEdit()
+            self.line_edit_npsh.setReadOnly(True)
+            self.line_edit_npsh.setPlaceholderText("Será calculado")
+            npsh_layout.addWidget(self.line_edit_npsh)
+            
+            params_layout.addLayout(npsh_layout)
+        
+        params_group.setLayout(params_layout)
+        group_layout.addWidget(params_group)
+        
+        # Adiciona componentes em um grupo separado
+        components_group = QGroupBox("Componentes")
+        components_layout = QVBoxLayout()
+        
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 5)
         
@@ -115,9 +248,9 @@ class SystemInputWidget(QWidget):
         
         header_layout.addWidget(desc_label, 2)
         header_layout.addWidget(quant_label, 1)
-        group_layout.addLayout(header_layout)
+        components_layout.addLayout(header_layout)
         
-        # Adiciona inputs
+        # Adiciona inputs para os componentes
         for label in input_labels:
             h_layout = QHBoxLayout()
             
@@ -136,12 +269,28 @@ class SystemInputWidget(QWidget):
                 input_spin_box.setDecimals(2)
                 input_spin_box.setSingleStep(0.1)
                 input_spin_box.setMaximum(99999)
+            
+            # Configurações para Diferença de Altura (permitir valores negativos)
+            if label == "Diferença de Altura":
+                input_spin_box.setMinimum(-100)  # Permitir valores negativos até -100m
+                input_spin_box.setMaximum(100)   # Permitir valores positivos até 100m
+                input_spin_box.setDecimals(2)    # Permitir 2 casas decimais
+                
+                # Tooltips diferentes para sucção e recalque
+                if is_suction:
+                    tooltip = "Valores positivos: bomba afogada (nível do fluido acima da sucção)\nValores negativos: nível do fluido abaixo da sucção da bomba"
+                    input_spin_box.setToolTip(tooltip)
+                    input_label.setToolTip(tooltip)
+                else:
+                    tooltip = "Diferença de altura do recalque (positiva quando o fluido sobe, negativa quando desce)"
+                    input_spin_box.setToolTip(tooltip)
+                    input_label.setToolTip(tooltip)
                 
             # Adiciona ao layout com proporções 2:1 para os campos
             h_layout.addWidget(input_label, 2)
             h_layout.addWidget(input_spin_box, 1)
             h_layout.setContentsMargins(0, 0, 0, 0)  # Remove margens extras
-            group_layout.addLayout(h_layout)
+            components_layout.addLayout(h_layout)
             
             # Adiciona à lista apropriada
             if is_suction:
@@ -150,10 +299,192 @@ class SystemInputWidget(QWidget):
                 self.quantity_discharge.append(input_spin_box)
         
         # Adiciona um stretchAtEnd para garantir que o espaço em branco fique na parte inferior
-        group_layout.addStretch(1)
+        components_layout.addStretch(1)
+        
+        components_group.setLayout(components_layout)
+        group_layout.addWidget(components_group)
         
         # Define o layout do grupo
         group_box.setLayout(group_layout)
+
+    def atualizar_velocidades(self):
+        """Atualiza as velocidades tanto para sucção quanto para recalque"""
+        self.atualizar_velocidade("suction")
+        self.atualizar_velocidade("discharge")
+
+    def atualizar_velocidade(self, section):
+        """
+        Calcula e atualiza a velocidade do fluido com base na vazão e no diâmetro selecionado.
+        
+        Parâmetros:
+            section: "suction" ou "discharge" para indicar qual seção atualizar
+        """
+        try:
+            # Usar a vazão unificada para ambos
+            q_m3_h = float(self.line_edit_vazao.text())
+            
+            if section == "suction":
+                selected_size = self.combo_diametro_suction.currentText()
+                line_edit_velocity = self.line_edit_velocity_suction
+            else:  # discharge
+                selected_size = self.combo_diametro_discharge.currentText()
+                line_edit_velocity = self.line_edit_velocity_discharge
+        except ValueError:
+            # Se a vazão não for um número válido, limpa os campos de velocidade
+            self.line_edit_velocity_suction.setText("")
+            self.line_edit_velocity_discharge.setText("")
+            return
+        
+        # Converte vazão de m³/h para m³/s
+        q_m3_s = q_m3_h / 3600.0
+        
+        try:
+            d = size_dict_internal_diameter_sch40[selected_size] * 0.001  # Converte para metros
+        except KeyError:
+            print(f"Chave não encontrada para o diâmetro: {selected_size}, utilizando valor padrão 0.05 m")
+            d = 0.05  # Valor padrão se não encontrado
+        
+        # Calcula a área e a velocidade
+        area = np.pi * (d / 2) ** 2
+        velocity = q_m3_s / area
+        
+        line_edit_velocity.setText(f"{velocity:.2f}")
+    
+    def calcular_pressao_vapor(self, temperatura):
+        """
+        Calcula a pressão de vapor da água com base na temperatura.
+        Esta é uma aproximação para água entre 0°C e 100°C.
+        
+        Parâmetros:
+            temperatura: Temperatura da água em °C
+            
+        Retorna:
+            Pressão de vapor em Pa
+        """
+        # Equação aproximada para pressão de vapor da água
+        # Baseada na equação de Antoine (simplificada)
+        # Válida para água entre 0°C e 100°C
+        if temperatura < 0 or temperatura > 100:
+            QMessageBox.warning(self, "Aviso", "Temperatura fora do intervalo válido (0-100°C).")
+            temperatura = max(0, min(temperatura, 100))
+        
+        # Valores aproximados para água com base na equação de Antoine
+        if temperatura <= 60:
+            # Aproximação para 0-60°C
+            pressao_vapor = 10**(8.07131 - 1730.63/(233.426 + temperatura)) * 133.322
+        else:
+            # Aproximação para 61-100°C
+            pressao_vapor = 10**(8.14019 - 1810.94/(244.485 + temperatura)) * 133.322
+        
+        return pressao_vapor
+    
+    def calcular_npsh_disponivel(self, suction_height, suction_friction_loss):
+        """
+        Calcula o NPSH disponível do sistema.
+        
+        NPSH_d = P_atm/ρg + h_s - h_v - h_f_sucção
+        
+        Onde:
+        - P_atm: pressão atmosférica (Pa)
+        - ρ: densidade do fluido (kg/m³)
+        - g: aceleração da gravidade (9.81 m/s²)
+        - h_s: altura estática da sucção (m)
+        - h_v: pressão de vapor do fluido (m coluna de fluido)
+        - h_f_sucção: perda de carga na linha de sucção (m)
+        
+        Retorna:
+            float: NPSH disponível em metros
+        """
+        # Obter acesso ao widget de propriedades do fluido
+        main_window = self.window()
+        fluid_prop_widget = main_window.fluid_prop_input_widget
+        
+        # Obter densidade do fluido
+        rho = fluid_prop_widget.get_rho_input_value()  # kg/m³
+        
+        # Pressão atmosférica padrão ao nível do mar (101325 Pa)
+        p_atm = 101325  # Pa
+        
+        # Pressão de vapor do fluido - baseada na temperatura
+        temperatura = fluid_prop_widget.temperature_input.value()  # °C
+        p_vapor = self.calcular_pressao_vapor(temperatura)  # Pa
+        
+        # Converter pressões para metros de coluna de fluido
+        h_atm = p_atm / (rho * 9.81)
+        h_vapor = p_vapor / (rho * 9.81)
+        
+        # Cálculo do NPSH disponível
+        npsh_disponivel = h_atm + suction_height - h_vapor - suction_friction_loss
+        
+        return npsh_disponivel
+    
+    def calcular_sistema(self):
+        """
+        Executa o cálculo do sistema utilizando os valores dos widgets,
+        calcula a curva do sistema e o NPSH disponível.
+        """
+        # Verificar se o campo de vazão está preenchido
+        try:
+            self.target_flow = float(self.line_edit_vazao.text())
+        except ValueError:
+            QMessageBox.critical(self, "Erro", "Por favor, preencha o campo de vazão corretamente.")
+            return False
+        
+        # Obter acesso ao widget de propriedades do fluido
+        main_window = self.window()
+        fluid_prop_widget = main_window.fluid_prop_input_widget
+        
+        # Obter os valores dos spinboxes
+        spinbox_suction = self.get_spinbox_values_suction()
+        spinbox_discharge = self.get_spinbox_values_discharge()
+        
+        # Obter tamanhos selecionados
+        suction_size = self.combo_diametro_suction.currentText()
+        discharge_size = self.combo_diametro_discharge.currentText()
+        
+        # Obter viscosidade, densidade e rugosidade
+        mu_value = fluid_prop_widget.get_mu_input_value()
+        rho_value = fluid_prop_widget.get_rho_input_value()
+        roughness = fluid_prop_widget.get_roughness_value()  # Obtém o valor de rugosidade do tubo em mm
+        
+        try:
+            # Calcular a curva do sistema
+            result = calculate_pipe_system_head_loss(
+                spinbox_suction, suction_size,
+                spinbox_discharge, discharge_size,
+                self.target_flow, mu_value, rho_value, roughness/1000  # Converte rugosidade de mm para m
+            )
+            
+            # Desempacotar resultados
+            head_values_coef, min_flow, max_flow, suction_friction_loss, suction_height = result
+            
+            # Armazenar valores para uso posterior
+            self.system_curve = head_values_coef
+            self.suction_friction_loss = suction_friction_loss
+            self.suction_height = suction_height
+            
+            # Calcular o NPSH disponível
+            self.npsh_disponivel = self.calcular_npsh_disponivel(suction_height, suction_friction_loss)
+            
+            # Atualizar o campo de NPSH disponível
+            self.line_edit_npsh.setText(f"{self.npsh_disponivel:.2f}")
+            
+            # Mostrar mensagem de sucesso
+            QMessageBox.information(
+                self, 
+                "Cálculo Concluído", 
+                f"Cálculo do sistema concluído com sucesso!\n\n"
+                f"NPSH Disponível: {self.npsh_disponivel:.2f} m"
+            )
+            
+            # Emitir sinal indicando que o cálculo foi concluído
+            self.calculoCompleto.emit()
+            
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao calcular o sistema: {str(e)}")
+            return False
 
     def get_spinbox_values_suction(self):
         """Retorna os valores dos spinboxes de sucção"""
@@ -165,12 +496,20 @@ class SystemInputWidget(QWidget):
 
     def get_suction_size(self):
         """Retorna o tamanho selecionado para sucção"""
-        if hasattr(self, 'input_size_list_suction'):
-            return self.input_size_list_suction.currentText()
-        return None
+        return self.combo_diametro_suction.currentText()
 
     def get_discharge_size(self):
         """Retorna o tamanho selecionado para recalque"""
-        if hasattr(self, 'input_size_list_discharge'):
-            return self.input_size_list_discharge.currentText()
-        return None
+        return self.combo_diametro_discharge.currentText()
+    
+    def get_target_flow(self):
+        """Retorna a vazão utilizada para o cálculo"""
+        return self.target_flow
+    
+    def get_system_curve(self):
+        """Retorna os coeficientes da curva do sistema"""
+        return self.system_curve
+    
+    def get_npsh_disponivel(self):
+        """Retorna o NPSH disponível calculado"""
+        return self.npsh_disponivel

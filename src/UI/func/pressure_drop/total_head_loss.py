@@ -96,11 +96,14 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
         target_flow_value: valor máximo de vazão (m³/h) para a curva
         mu: viscosidade dinâmica (em unidades compatíveis, lembrando o ajuste)
         rho: densidade (kg/m³)
+        roughness: rugosidade absoluta da tubulação (m)
     
     Retorna:
         head_values_coef: coeficientes do polinômio ajustado (grau 5)
         min_flow: vazão mínima (0)
         max_flow: vazão máxima (target_flow_value * 1.40)
+        suction_friction_loss: perda de carga na sucção para a vazão de projeto (m)
+        suction_height: altura de sucção (m) - valor do segundo elemento do suction_array
     """
     import numpy as np
 
@@ -161,7 +164,7 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
         h=discharge_height,
         K=0,
         roughness=roughness
-    )
+        )
 
     # --- Perda de carga total do sistema ---
     total_head_loss = head_loss_suction + head_loss_discharge
@@ -172,8 +175,25 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
     # Define os limites de vazão
     min_flow = 0
     max_flow = target_flow_value * 1.40
+    
+    # Calcular a perda de carga na sucção para a vazão de projeto
+    # Garantindo que o resultado seja tratado corretamente, independentemente se é escalar ou array
+    suction_friction_loss_result = pressure_loss(
+        D_suction,
+        L_eff_suction,
+        np.array([target_flow_value]),
+        mu / 1000,
+        rho,
+        g=9.81,
+        h=0,  # Desconsiderar elevação para obter apenas a perda por fricção
+        K=0,
+        roughness=roughness
+    )
+    
+    # Use np.atleast_1d para garantir que seja tratado como array, mesmo que seja escalar
+    suction_friction_loss = np.atleast_1d(suction_friction_loss_result)[0]
 
-    return head_values_coef, min_flow, max_flow
+    return head_values_coef, min_flow, max_flow, suction_friction_loss, suction_height
 
 def calculate_total_equivalent_length(local_loss_array_quantities):
     # Input: local_loss_array_quantities é um numpy array com as quantidades de perda local.
