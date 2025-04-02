@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
 
         # Main window Layout
         self.setWindowTitle("Selecionador de Bombas")
-        self.setMinimumSize(QSize(1200, 768))
+        self.setMinimumSize(QSize(1200, 900))
   
         # Widgets
         central_widget = QWidget()
