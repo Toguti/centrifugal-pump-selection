@@ -19,7 +19,6 @@ from typing import Dict, Any, Tuple, List, Optional, Union
 # Importações adicionais
 from UI.func.auto_pump_selection import auto_pump_selection, find_intersection_points
 from UI.pump_graph import PumpGraphComponent  # Novo componente de gráficos
-from UI.curve_digitizer import CurveDigitizerWidget
 
 
 class FloatDelegate(QStyledItemDelegate):
