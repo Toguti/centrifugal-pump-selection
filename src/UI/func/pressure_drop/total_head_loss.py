@@ -118,13 +118,13 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
 
 
     # --- Extração dos parâmetros de sucção ---
-    suction_length = suction_array[0]
-    suction_height = suction_array[1]
+    suction_length = suction_array[0] # comprimento de sucção (m)
+    suction_height = suction_array[1]*(-1)   # altura de sucção (m)
     suction_local_loss = suction_array[2:]  # perdas locais fornecidas pelo usuário
 
     # --- Extração dos parâmetros de descarga ---
-    discharge_length = discharge_array[0]
-    discharge_height = discharge_array[1]
+    discharge_length = discharge_array[0]  # comprimento de descarga (m)
+    discharge_height = discharge_array[1] # altura de descarga (m)
     discharge_local_loss = discharge_array[2:]  # perdas locais fornecidas pelo usuário
 
     # --- Comprimento equivalente das singularidades baseado no diâmetro padrão ---
@@ -192,6 +192,8 @@ def calculate_pipe_system_head_loss(suction_array, suction_size, discharge_array
     
     # Use np.atleast_1d para garantir que seja tratado como array, mesmo que seja escalar
     suction_friction_loss = np.atleast_1d(suction_friction_loss_result)[0]
+
+    suction_height = suction_height*(-1)  # Ajuste para o valor correto da altura de sucção
 
     return head_values_coef, min_flow, max_flow, suction_friction_loss, suction_height
 

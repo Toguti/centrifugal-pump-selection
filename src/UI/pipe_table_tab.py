@@ -13,7 +13,7 @@ from UI.extra.local_loss import size_dict_internal_diameter_sch40
 from UI.func.pressure_drop.total_head_loss import calculate_pipe_system_head_loss
 import numpy as np
 import pandas as pd
-
+import logging
 
 class SystemInputWidget(QWidget):
     # Sinal para indicar que o cálculo foi concluído
@@ -122,51 +122,51 @@ class SystemInputWidget(QWidget):
         
         # Valores iniciais para testes
         input_values_suction = {
-            "Trecho Retilineo": 10,  # metros
-            "Diferença de Altura": 2,  # metros
-            "Cotovelo 90° Raio Longo": 1,  # quantidade
+            "Trecho Retilineo": 5,  # metros
+            "Diferença de Altura": -3,  # metros
+            "Cotovelo 90° Raio Longo": 0,  # quantidade
             "Cotovelo 90° Raio Médio": 0, 
-            "Cotovelo 90° Raio Curto": 0,
+            "Cotovelo 90° Raio Curto": 1,
             "Cotovelo 45°": 0, 
             "Curva 90° Raio Longo": 0, 
             "Curva 90° Raio Curto": 0, 
             "Curva 45°": 0, 
             "Entrada Normal": 0, 
-            "Entrada de Borda": 0, 
-            "Válvula Gaveta Aberta": 0, 
+            "Entrada de Borda": 1, 
+            "Válvula Gaveta Aberta": 1, 
             "Válvula Globo Aberta": 0, 
             "Válvula Ângular Aberta": 0, 
             "Passagem Reta Tê": 0,
             "Derivação Tê": 0, 
             "Bifurcação Tê": 0, 
-            "Válvula de Pé e Crivo": 1,  # quantidade
+            "Válvula de Pé e Crivo": 0,  # quantidade
             "Saída de Canalização": 0, 
             "Válvula de Retenção Leve": 0, 
             "Válvula de Retenção Pesado": 0
         }
 
         input_values_discharge = {
-            "Trecho Retilineo": 2840,  # metros
-            "Diferença de Altura": 8,  # metros estimados
+            "Trecho Retilineo": 87.1,  # metros
+            "Diferença de Altura": 22.1,  # metros estimados
             "Cotovelo 90° Raio Longo": 0, 
             "Cotovelo 90° Raio Médio": 0, 
-            "Cotovelo 90° Raio Curto": 0,
+            "Cotovelo 90° Raio Curto": 9,
             "Cotovelo 45°": 0, 
             "Curva 90° Raio Longo": 0, 
             "Curva 90° Raio Curto": 0, 
             "Curva 45°": 0, 
             "Entrada Normal": 0, 
             "Entrada de Borda": 0, 
-            "Válvula Gaveta Aberta": 0, 
-            "Válvula Globo Aberta": 1,  # registro de globo aberto
+            "Válvula Gaveta Aberta": 2, 
+            "Válvula Globo Aberta": 0,  # registro de globo aberto
             "Válvula Ângular Aberta": 0, 
-            "Passagem Reta Tê": 0,
+            "Passagem Reta Tê": 3,
             "Derivação Tê": 0, 
             "Bifurcação Tê": 0, 
             "Válvula de Pé e Crivo": 0, 
-            "Saída de Canalização": 1,  # quantidade
+            "Saída de Canalização": 0,  # quantidade
             "Válvula de Retenção Leve": 0, 
-            "Válvula de Retenção Pesado": 1  # válvula de retenção
+            "Válvula de Retenção Pesado": 2  # válvula de retenção
         }
         
         # Seleciona os valores apropriados baseado no tipo de entrada
@@ -267,13 +267,13 @@ class SystemInputWidget(QWidget):
             # Configurações especiais para o trecho retilíneo
             if label == "Trecho Retilineo":
                 input_spin_box.setDecimals(2)
-                input_spin_box.setSingleStep(0.1)
-                input_spin_box.setMaximum(99999)
+                input_spin_box.setSingleStep(0.05)
+                input_spin_box.setMaximum(999999)
             
             # Configurações para Diferença de Altura (permitir valores negativos)
             if label == "Diferença de Altura":
-                input_spin_box.setMinimum(-100)  # Permitir valores negativos até -100m
-                input_spin_box.setMaximum(100)   # Permitir valores positivos até 100m
+                input_spin_box.setMinimum(-999)  # Permitir valores negativos até -100m
+                input_spin_box.setMaximum(999)   # Permitir valores positivos até 100m
                 input_spin_box.setDecimals(2)    # Permitir 2 casas decimais
                 
                 # Tooltips diferentes para sucção e recalque
@@ -378,11 +378,11 @@ class SystemInputWidget(QWidget):
         
         return pressao_vapor
     
-    def calcular_npsh_disponivel(self, suction_height, suction_friction_loss):
+    def calcular_npsh_disponivel(self, suction_height, suction_friction_loss, flow_values=None):
         """
-        Calcula o NPSH disponível do sistema.
+        Calcula o NPSH disponível do sistema para uma faixa de vazões.
         
-        NPSH_d = P_atm/ρg + h_s - h_v - h_f_sucção
+        NPSH_d = P_atm/ρg + h_s - h_v - h_f_sucção(Q)
         
         Onde:
         - P_atm: pressão atmosférica (Pa)
@@ -390,33 +390,91 @@ class SystemInputWidget(QWidget):
         - g: aceleração da gravidade (9.81 m/s²)
         - h_s: altura estática da sucção (m)
         - h_v: pressão de vapor do fluido (m coluna de fluido)
-        - h_f_sucção: perda de carga na linha de sucção (m)
+        - h_f_sucção(Q): perda de carga na linha de sucção em função da vazão (m)
         
+        Parâmetros:
+            suction_height: Altura estática da sucção (m)
+            suction_friction_loss: Perda de carga na linha de sucção para vazão de projeto (m)
+            flow_values: Array de valores de vazão para cálculo da curva (opcional)
+            
         Retorna:
-            float: NPSH disponível em metros
+            Se flow_values for None: NPSH disponível em metros para a vazão de projeto
+            Se flow_values for fornecido: Array com valores de NPSH disponível para cada vazão
         """
-        # Obter acesso ao widget de propriedades do fluido
-        main_window = self.window()
-        fluid_prop_widget = main_window.fluid_prop_input_widget
-        
-        # Obter densidade do fluido
-        rho = fluid_prop_widget.get_rho_input_value()  # kg/m³
-        
-        # Pressão atmosférica padrão ao nível do mar (101325 Pa)
-        p_atm = 101325  # Pa
-        
-        # Pressão de vapor do fluido - baseada na temperatura
-        temperatura = fluid_prop_widget.temperature_input.value()  # °C
-        p_vapor = self.calcular_pressao_vapor(temperatura)  # Pa
-        
-        # Converter pressões para metros de coluna de fluido
-        h_atm = p_atm / (rho * 9.81)
-        h_vapor = p_vapor / (rho * 9.81)
-        
-        # Cálculo do NPSH disponível
-        npsh_disponivel = h_atm + suction_height - h_vapor - suction_friction_loss
-        
-        return npsh_disponivel
+        try:
+            # Obter acesso ao widget de propriedades do fluido
+            main_window = self.window()
+            fluid_prop_widget = main_window.fluid_prop_input_widget
+            
+            # Obter densidade do fluido
+            rho = fluid_prop_widget.get_rho_input_value()  # kg/m³
+            
+            # Pressão atmosférica padrão ao nível do mar (101325 Pa)
+            p_atm = 101325  # Pa
+            
+            # Pressão de vapor do fluido - baseada na temperatura
+            temperatura = fluid_prop_widget.temperature_input.value()  # °C
+            p_vapor = self.calcular_pressao_vapor(temperatura)  # Pa
+            
+            # Converter pressões para metros de coluna de fluido
+            h_atm = p_atm / (rho * 9.81)
+            h_vapor = p_vapor / (rho * 9.81)
+            
+            logging.info(f"Altura equivalente atmosférica: {h_atm:.2f} m")
+            logging.info(f"Altura equivalente da pressão de vapor: {h_vapor:.2f} m")
+            logging.info(f"Altura estática da sucção: {suction_height:.2f} m")
+            logging.info(f"Perda de carga na vazão de projeto: {suction_friction_loss:.2f} m")
+            
+            # Se não forneceu vazões, retorna apenas para a vazão de projeto
+            if flow_values is None:
+                npsh_disponivel = h_atm + suction_height - h_vapor - suction_friction_loss
+                logging.info(f"NPSH disponível calculado (ponto único): {npsh_disponivel:.2f} m")
+                return npsh_disponivel
+            
+            # Caso contrário, calcula para cada vazão
+            # Precisamos escalar a perda de carga de acordo com a lei quadrática (Q²)
+            vazao_projeto = float(self.line_edit_vazao.text())
+            
+            # Verificar se a vazão de projeto é válida
+            if vazao_projeto <= 0:
+                logging.warning("Vazão de projeto inválida, usando 1.0 m³/h como fallback")
+                vazao_projeto = 1.0
+            
+            # Array para armazenar valores de NPSH
+            npsh_values = np.zeros_like(flow_values)
+            
+            # Filtrar valores negativos ou zero (para evitar problemas no cálculo)
+            valid_indices = flow_values > 0
+            
+            # Para valores válidos, calcular NPSH disponível
+            for i, vazao in enumerate(flow_values):
+                if vazao > 0:  # Evitar divisão por zero
+                    # A perda de carga varia com o quadrado da vazão
+                    perda_carga_proporcional = suction_friction_loss * (vazao / vazao_projeto) ** 2
+                    
+                    # Cálculo do NPSH disponível para cada vazão
+                    npsh_values[i] = h_atm + suction_height - h_vapor - perda_carga_proporcional
+                else:
+                    # Para vazão zero, a perda de carga é zero
+                    npsh_values[i] = h_atm + suction_height - h_vapor
+            
+            # Log dos resultados para depuração
+            min_npsh = np.min(npsh_values)
+            max_npsh = np.max(npsh_values)
+            logging.info(f"Curva de NPSH disponível calculada: {len(npsh_values)} pontos, range [{min_npsh:.2f}, {max_npsh:.2f}]")
+            
+            return npsh_values
+            
+        except Exception as e:
+            logging.error(f"Erro ao calcular NPSH disponível: {e}", exc_info=True)
+            
+            # Em caso de erro, retorna um valor padrão ou array de zeros
+            if flow_values is None:
+                return 0.0
+            else:
+                return np.zeros_like(flow_values)
+
+
     
     def calcular_sistema(self):
         """
@@ -463,7 +521,11 @@ class SystemInputWidget(QWidget):
             self.suction_friction_loss = suction_friction_loss
             self.suction_height = suction_height
             
-            # Calcular o NPSH disponível
+            logging.info(f"Sistema calculado - Coeficientes: {head_values_coef}")
+            logging.info(f"Perda de carga na sucção: {suction_friction_loss:.2f} m")
+            logging.info(f"Altura estática da sucção: {suction_height:.2f} m")
+            
+            # Calcular o NPSH disponível no ponto de projeto
             self.npsh_disponivel = self.calcular_npsh_disponivel(suction_height, suction_friction_loss)
             
             # Atualizar o campo de NPSH disponível
@@ -484,6 +546,7 @@ class SystemInputWidget(QWidget):
             
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao calcular o sistema: {str(e)}")
+            logging.error(f"Erro no cálculo do sistema: {e}", exc_info=True)
             return False
 
     def get_spinbox_values_suction(self):
@@ -510,6 +573,49 @@ class SystemInputWidget(QWidget):
         """Retorna os coeficientes da curva do sistema"""
         return self.system_curve
     
-    def get_npsh_disponivel(self):
-        """Retorna o NPSH disponível calculado"""
-        return self.npsh_disponivel
+    def get_npsh_disponivel(self, flow_values=None):
+        """
+        Retorna o NPSH disponível calculado.
+        Se flow_values for fornecido, retorna a curva de NPSH disponível para essas vazões.
+        
+        Parâmetros:
+            flow_values: Array de valores de vazão (opcional)
+            
+        Retorna:
+            Se flow_values for None: Valor fixo do NPSH disponível no ponto de projeto
+            Se flow_values for fornecido: Array de valores de NPSH disponível para cada vazão
+        """
+        try:
+            # Verificar se temos os dados necessários para o cálculo
+            if not hasattr(self, 'suction_height') or not hasattr(self, 'suction_friction_loss'):
+                logging.warning("Dados de sistema não disponíveis para calcular NPSH disponível variável")
+                
+                # Se não temos os dados necessários, retornar o valor fixo
+                if flow_values is None:
+                    return self.npsh_disponivel
+                else:
+                    # Retornar um array constante com o valor fixo
+                    return np.full_like(flow_values, self.npsh_disponivel)
+            
+            if flow_values is None:
+                return self.npsh_disponivel
+            else:
+                # Calcular NPSH disponível para os valores de vazão fornecidos
+                npsh_curva = self.calcular_npsh_disponivel(self.suction_height, self.suction_friction_loss, flow_values)
+                
+                # Log básico para depuração
+                if npsh_curva is not None and len(npsh_curva) > 0:
+                    logging.info(f"Retornando curva de NPSH disponível com {len(npsh_curva)} pontos: [{np.min(npsh_curva):.2f}, {np.max(npsh_curva):.2f}]")
+                else:
+                    logging.warning("Curva de NPSH disponível não calculada corretamente")
+                    
+                return npsh_curva
+        except Exception as e:
+            logging.error(f"Erro em get_npsh_disponivel: {e}", exc_info=True)
+            
+            # Em caso de erro, retornar um valor padrão ou array de zeros
+            if flow_values is None:
+                return 0.0
+            else:
+                return np.zeros_like(flow_values)
+

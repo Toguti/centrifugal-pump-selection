@@ -1,7 +1,5 @@
 import sys
 import os
-import sqlite3
-import json
 import numpy as np
 import logging
 from PyQt6.QtCore import QTimer
@@ -12,12 +10,10 @@ from PyQt6.QtWidgets import (
     QListWidgetItem, QComboBox
 )
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from typing import Dict, Any, Tuple, List, Optional, Union
+from typing import Dict, Any, Tuple, Optional
 
 # Importações adicionais
-from UI.func.auto_pump_selection import auto_pump_selection, find_intersection_points
+from UI.func.auto_pump_selection import auto_pump_selection
 from UI.pump_graph import PumpGraphComponent  # Novo componente de gráficos
 
 
@@ -315,7 +311,7 @@ class PumpSelectionWidget(QWidget):
             logging.info(f"Curva do sistema recebida: {len(self.system_curve)} coeficientes")
             
         logging.info(f"Vazão alvo: {self.target_flow}")
-        logging.info(f"NPSH disponível: {npsh_disponivel}")
+        logging.info(f"NPSH disponível (ponto de projeto): {npsh_disponivel}")
         
         # Atualizar campos na interface
         if self.target_flow is not None:
@@ -380,13 +376,17 @@ class PumpSelectionWidget(QWidget):
         # Limpar a seleção atual
         self.limpar_selecao_bomba()
         
-        # Criar flow_values para o gráfico (valores de vazão)
-        flow_values = np.linspace(0, self.target_flow * 1.4, 500)
+        # Criar flow_values para o gráfico (valores de vazão por bomba)
+        max_vazao_por_bomba = vazao_por_bomba * 1.4  # Utilizar a vazão por bomba, não a total
+        flow_values = np.linspace(0, max_vazao_por_bomba, 500)
         
-        # Obter NPSH disponível para os gráficos
-        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        logging.info(f"Calculando NPSH disponível para vazões de 0 a {max_vazao_por_bomba:.2f} m³/h por bomba")
         
-        logging.info(f"Atualizando gráficos com {n_bombas} bombas, vazão máx: {self.target_flow * 1.4}, NPSH disp: {npsh_disponivel}")
+        # Obter NPSH disponível para os gráficos como uma curva
+        # Importante: calcular com base na vazão por bomba
+        npsh_disponivel_curva = self.system_input_widget.get_npsh_disponivel(flow_values)
+        
+        logging.info(f"Atualizando gráficos com {n_bombas} bombas, vazão máx por bomba: {max_vazao_por_bomba:.2f}")
         
         # IMPORTANTE: Tratar alteração do número de bombas como uma atualização da curva do sistema
         # que requer recálculo das escalas, mas não um sistema completamente novo
@@ -394,8 +394,21 @@ class PumpSelectionWidget(QWidget):
             system_curve=self.system_curve,
             flow_values=flow_values,
             n_bombas=n_bombas,
-            npsh_disponivel=npsh_disponivel
+            npsh_disponivel=npsh_disponivel_curva
         )
+        
+        # Se temos bombas selecionadas, atualizar as margens de NPSH e gráficos
+        if self.selected_pump_index is not None and self.pumps and len(self.pumps) > self.selected_pump_index:
+            selected_pump = self.pumps[self.selected_pump_index]
+            
+            # Recalcular o ponto de operação considerando o novo número de bombas
+            self.calcular_ponto_operacao(selected_pump, n_bombas)
+            
+            # Atualizar os dados da bomba na interface
+            self.atualizar_dados_bomba_selecionada(selected_pump)
+            
+            # Atualizar o gráfico com os novos dados
+            self.atualizar_grafico_bomba_selecionada(selected_pump)
 
 
     
@@ -509,13 +522,28 @@ class PumpSelectionWidget(QWidget):
         if not self.verificar_precondições_selecao():
             return
         
-        # Obter parâmetros do sistema
-        npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+        # Obter o número de bombas em paralelo
         n_bombas = int(self.combo_n_bombas.currentText())
         vazao_por_bomba = self.target_flow / n_bombas
         
+        logging.info(f"Número de bombas: {n_bombas}, vazão por bomba: {vazao_por_bomba:.2f} m³/h")
+        
+        # Criar flow_values baseado na vazão por bomba, não na vazão total
+        # Isto é importante para o cálculo correto do NPSH disponível
+        max_vazao_por_bomba = vazao_por_bomba * 1.4  # Margem de 40%
+        flow_values = np.linspace(0, max_vazao_por_bomba, 500)
+        
+        logging.info(f"Calculando NPSH disponível para vazões de 0 a {max_vazao_por_bomba:.2f} m³/h por bomba")
+        
+        # Obter NPSH disponível para a curva de vazão por bomba
+        npsh_disponivel_curva = self.system_input_widget.get_npsh_disponivel(flow_values)
+        
+        # Calcular o valor de NPSH disponível no ponto de vazão de projeto (para filtro)
+        projeto_idx = np.abs(flow_values - vazao_por_bomba).argmin()
+        npsh_disponivel_valor = npsh_disponivel_curva[projeto_idx] if projeto_idx < len(npsh_disponivel_curva) else 0
+        
         # Logging de parâmetros
-        self.logar_parametros_selecao(npsh_disponivel, n_bombas, vazao_por_bomba)
+        self.logar_parametros_selecao(npsh_disponivel_valor, n_bombas, vazao_por_bomba)
         
         # Ajustar curva do sistema para bombas em paralelo
         system_curve_adjusted = self.adjust_system_curve_for_parallel_pumps(self.system_curve, n_bombas)
@@ -542,14 +570,13 @@ class PumpSelectionWidget(QWidget):
             self.pumps = []
             
             # Atualizar o gráfico mesmo sem bomba selecionada
-            # CORREÇÃO: is_new_system=False para não resetar a escala
-            flow_values = np.linspace(0, self.target_flow * 1.4, 500)
+            # Importante: use a vazão por bomba para o flow_values no gráfico
             self.graph_component.update_plots(
-                system_curve=self.system_curve,
-                flow_values=flow_values,
-                n_bombas=n_bombas,
-                npsh_disponivel=npsh_disponivel,
-                is_new_system=False  # ALTERADO: Não é um novo sistema
+                system_curve=self.system_curve,  # Curva original do sistema (não ajustada)
+                flow_values=flow_values,         # Valores de vazão por bomba
+                n_bombas=n_bombas,               # Número de bombas em paralelo
+                npsh_disponivel=npsh_disponivel_curva,
+                is_new_system=False
             )
             return
         
@@ -557,8 +584,8 @@ class PumpSelectionWidget(QWidget):
         logging.info(f"Auto pump selection retornou {len(pumps)} bombas")
         
         # Processar e filtrar bombas
-        # Nota: O método processar_bombas agora já está corrigido para usar is_new_system=False
-        self.processar_bombas(pumps, npsh_disponivel, vazao_por_bomba, n_bombas)
+        self.processar_bombas(pumps, npsh_disponivel_valor, npsh_disponivel_curva, vazao_por_bomba, n_bombas, flow_values)
+
     
     def verificar_precondições_selecao(self) -> bool:
         """Verifica as pré-condições para a seleção de bombas."""
@@ -579,27 +606,49 @@ class PumpSelectionWidget(QWidget):
     
     def logar_parametros_selecao(self, npsh_disponivel, n_bombas, vazao_por_bomba):
         """Registra os parâmetros de seleção no log."""
-        logging.info(f"NPSH disponível utilizado: {npsh_disponivel:.2f} m")
+        logging.info(f"NPSH disponível utilizado (ponto de projeto): {npsh_disponivel:.2f} m")
         logging.info(f"Número de bombas em paralelo: {n_bombas}")
         logging.info(f"Vazão total do sistema: {self.target_flow:.2f} m³/h")
         logging.info(f"Vazão alvo por bomba: {vazao_por_bomba:.2f} m³/h")
     
-    def processar_bombas(self, pumps, npsh_disponivel, vazao_por_bomba, n_bombas):
-        """Processa e filtra as bombas com base no NPSH disponível."""
+    def processar_bombas(self, pumps, npsh_disponivel_valor, npsh_disponivel_curva, vazao_por_bomba, n_bombas, flow_values):
+        """
+        Processa e filtra as bombas com base no NPSH disponível.
+        
+        Parâmetros:
+            pumps: Lista de bombas retornadas pelo auto_pump_selection
+            npsh_disponivel_valor: Valor de NPSH disponível no ponto de projeto (para filtro)
+            npsh_disponivel_curva: Curva de NPSH disponível para plotagem
+            vazao_por_bomba: Vazão alvo por bomba
+            n_bombas: Número de bombas em paralelo
+            flow_values: Valores de vazão para plotagem
+        """
         # Filtrar bombas com base no critério NPSH
         pumps_filtered = []
         filtered_out_count = 0
         
         for pump in pumps:
-            # Verificar se o NPSH requerido da bomba é menor que o NPSH disponível
-            if pump['pump_npshr'] < npsh_disponivel:
+            vazao_bomba = 0
+            if 'intersecoes' in pump and len(pump['intersecoes']) > 0:
+                if isinstance(pump['intersecoes'][0], list):
+                    vazao_bomba = pump['intersecoes'][0][0]
+                else:
+                    vazao_bomba = pump['intersecoes'][0]
+            
+            # Obter NPSH disponível no ponto de operação específico da bomba
+            idx_npsh = np.abs(flow_values - vazao_bomba).argmin() if vazao_bomba > 0 else 0
+            npsh_valor_no_ponto = npsh_disponivel_curva[idx_npsh] if idx_npsh < len(npsh_disponivel_curva) else npsh_disponivel_valor
+            
+            # Verificar se o NPSH requerido da bomba é menor que o NPSH disponível no ponto de operação
+            if pump['pump_npshr'] < npsh_valor_no_ponto:
                 # Calcular e armazenar valores do ponto de operação
                 self.calcular_ponto_operacao(pump, n_bombas)
                 pumps_filtered.append(pump)
+                logging.info(f"Bomba aceita: {pump['marca']} {pump['modelo']} - NPSHr: {pump['pump_npshr']:.2f} m < NPSHd: {npsh_valor_no_ponto:.2f} m (vazão={vazao_bomba:.2f})")
             else:
                 filtered_out_count += 1
                 logging.info(f"Bomba filtrada por NPSH: {pump['marca']} {pump['modelo']} - "
-                            f"NPSHr: {pump['pump_npshr']:.2f} m > NPSHd: {npsh_disponivel:.2f} m")
+                            f"NPSHr: {pump['pump_npshr']:.2f} m > NPSHd: {npsh_valor_no_ponto:.2f} m (vazão={vazao_bomba:.2f})")
         
         logging.info(f"Bombas removidas pelo filtro NPSH: {filtered_out_count}")
         
@@ -609,14 +658,12 @@ class PumpSelectionWidget(QWidget):
             self.pumps = []
             
             # Atualizar o gráfico mesmo sem bomba selecionada
-            # CORREÇÃO: is_new_system=False para não resetar a escala
-            flow_values = np.linspace(0, self.target_flow * 1.4, 500)
             self.graph_component.update_plots(
-                system_curve=self.system_curve,
-                flow_values=flow_values,
-                n_bombas=n_bombas,
-                npsh_disponivel=npsh_disponivel,
-                is_new_system=False  # ALTERADO: Não é um novo sistema
+                system_curve=self.system_curve,  # Curva original do sistema (não ajustada)
+                flow_values=flow_values,         # Valores de vazão por bomba
+                n_bombas=n_bombas,               # Número de bombas em paralelo
+                npsh_disponivel=npsh_disponivel_curva,
+                is_new_system=False
             )
             return
         
@@ -637,30 +684,39 @@ class PumpSelectionWidget(QWidget):
         
         # Atualizar o gráfico com a primeira bomba
         if self.pumps:
-            flow_values = np.linspace(0, self.target_flow * 1.4, 500)
             pump = self.pumps[0]
             intersection_point = pump.get('ponto_intersecao', [pump.get('vazao_bomba', 0), pump.get('head_value', 0)])
             
-            # CORREÇÃO: is_new_system=False para não resetar a escala
+            # Atualizar gráfico
             self.graph_component.update_plots(
-                system_curve=self.system_curve,
-                pump_data=pump,
-                flow_values=flow_values,
-                n_bombas=n_bombas,
+                system_curve=self.system_curve,  # Usa a curva original do sistema
+                pump_data=pump,                  # Dados da bomba selecionada
+                flow_values=flow_values,         # Valores de vazão por bomba
+                n_bombas=n_bombas,               # Número de bombas em paralelo
                 intersection_point=intersection_point,
-                npsh_disponivel=npsh_disponivel,
-                is_new_system=False  # ALTERADO: Não é um novo sistema
+                npsh_disponivel=npsh_disponivel_curva,
+                is_new_system=False
             )
 
     
     def calcular_ponto_operacao(self, pump, n_bombas):
         """
-        Calcula o ponto de operação da bomba.
+        Calcula o ponto de operação da bomba e a margem de NPSH.
         Usa diretamente as informações de interseção fornecidas por auto_pump_selection.
+        Considera o número de bombas em paralelo para o cálculo correto.
+        
+        Parâmetros:
+            pump: Dicionário com dados da bomba
+            n_bombas: Número de bombas em paralelo
         """
         try:
             # Extrair vazão e head do ponto de interseção
             vazao_bomba, head_value = self.extrair_valores_intersecao(pump, self.system_curve_adjusted)
+            
+            # Verificação de segurança para vazão inválida
+            if vazao_bomba <= 0:
+                vazao_bomba = self.target_flow / n_bombas
+                head_value = np.polyval(self.system_curve_adjusted, vazao_bomba)
             
             # Calcular vazão total
             vazao_total = vazao_bomba * n_bombas
@@ -670,6 +726,60 @@ class PumpSelectionWidget(QWidget):
             pump['vazao_total'] = vazao_total
             pump['head_value'] = head_value
             pump['ponto_intersecao'] = [vazao_bomba, head_value]
+            
+            # Criar array com valores de vazão amplos para garantir cobertura
+            flow_values = np.linspace(0, self.target_flow * 1.4, 500)
+            
+            # Obter curva completa de NPSH disponível para visualização e cálculos
+            npsh_disponivel_curva = self.system_input_widget.get_npsh_disponivel(flow_values)
+            
+            # Encontrar o valor exato no ponto de operação por bomba
+            idx_bomba = np.abs(flow_values - vazao_bomba).argmin()
+            
+            # Log dos valores de vazão e índice para depuração
+            logging.info(f"Ponto de operação: vazão por bomba={vazao_bomba:.2f} m³/h, índice={idx_bomba}")
+            
+            # Calcular valores de NPSHr, eficiência e potência no ponto de operação
+            try:
+                # Garantir que temos coeficientes válidos
+                if all(k in pump for k in ['pump_coef_npshr', 'pump_coef_eff', 'pump_coef_power']):
+                    # Calcular NPSHr no ponto de operação
+                    if pump['pump_coef_npshr'] is not None:
+                        npshr_value = np.polyval(pump['pump_coef_npshr'], vazao_bomba)
+                        pump['pump_npshr'] = npshr_value
+                        logging.info(f"NPSHr calculado no ponto de operação: {npshr_value:.2f} m")
+                    
+                    # Calcular eficiência no ponto de operação
+                    if pump['pump_coef_eff'] is not None:
+                        eff_value = np.polyval(pump['pump_coef_eff'], vazao_bomba)
+                        pump['pump_eff'] = eff_value
+                    
+                    # Calcular potência no ponto de operação
+                    if pump['pump_coef_power'] is not None:
+                        power_value = np.polyval(pump['pump_coef_power'], vazao_bomba)
+                        pump['pump_power'] = power_value
+            except Exception as e:
+                logging.error(f"Erro ao calcular valores da bomba no ponto de operação: {e}", exc_info=True)
+            
+            # Calcular margem de NPSH no ponto de operação
+            try:
+                # Verificar se temos o valor de NPSH disponível no ponto específico
+                if idx_bomba < len(npsh_disponivel_curva):
+                    npsh_disponivel_value = npsh_disponivel_curva[idx_bomba]
+                    npsh_requerido = pump.get('pump_npshr', 0)
+                    
+                    # Armazenar os valores específicos
+                    pump['npsh_disponivel_ponto'] = npsh_disponivel_value
+                    margem_npsh = npsh_disponivel_value - npsh_requerido
+                    
+                    # Armazenar a margem calculada
+                    pump['npsh_margin'] = margem_npsh
+                    
+                    logging.info(f"Margem de NPSH calculada: {margem_npsh:.2f} m (NPSH disponível: {npsh_disponivel_value:.2f} m, NPSHr: {npsh_requerido:.2f} m)")
+                else:
+                    logging.warning(f"Índice de vazão fora dos limites: {idx_bomba} >= {len(npsh_disponivel_curva)}")
+            except Exception as e:
+                logging.error(f"Erro ao calcular margem de NPSH: {e}", exc_info=True)
             
             logging.info(f"Ponto de operação calculado: vazão={vazao_bomba:.2f}, head={head_value:.2f}, vazão total={vazao_total:.2f}")
             
@@ -800,23 +910,61 @@ class PumpSelectionWidget(QWidget):
             logging.error(f"Erro ao atualizar dados da bomba: {e}", exc_info=True)
     
     def atualizar_margem_npsh(self, pump):
-        """Atualiza o campo de margem de NPSH e aplica formatação condicional."""
+        """
+        Atualiza o campo de margem de NPSH e aplica formatação condicional.
+        Usa a margem já calculada no ponto de operação específico da bomba.
+        """
         try:
-            npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
-            npsh_requerido = pump.get('pump_npshr', 0)
-            
-            if npsh_disponivel is not None:
-                margem_npsh = npsh_disponivel - npsh_requerido
-                margem_str = f"{margem_npsh:.2f}".replace('.', ',')
-    
-                self.result_npsh_comparison.setText(margem_str + " m")
-                
-                logging.info(f"Margem de NPSH atualizada: {margem_npsh:.2f} m")
+            # Verificar se já temos a margem calculada
+            if 'npsh_margin' in pump and 'npsh_disponivel_ponto' in pump:
+                margem_npsh = pump['npsh_margin']
+                npsh_disponivel_ponto = pump['npsh_disponivel_ponto']
+                npsh_requerido = pump.get('pump_npshr', 0)
             else:
-                self.result_npsh_comparison.setText("N/D")
+                # Se não, recalcular no ponto de operação específico
+                vazao_bomba = pump.get('vazao_bomba', 0.0)
+                
+                # Verificar se a vazão é válida
+                if vazao_bomba <= 0:
+                    self.result_npsh_comparison.setText("N/D")
+                    logging.warning("Vazão da bomba inválida, não é possível calcular margem de NPSH")
+                    return
+                
+                # Obter o NPSH disponível específico para essa vazão
+                flow_point = np.array([vazao_bomba])
+                npsh_disponivel_curva = self.system_input_widget.get_npsh_disponivel(flow_point)
+                
+                if npsh_disponivel_curva is None or len(npsh_disponivel_curva) == 0:
+                    self.result_npsh_comparison.setText("N/D")
+                    logging.warning("Não foi possível obter o NPSH disponível no ponto de operação")
+                    return
+                    
+                npsh_disponivel_ponto = npsh_disponivel_curva[0]
+                npsh_requerido = pump.get('pump_npshr', 0)
+                margem_npsh = npsh_disponivel_ponto - npsh_requerido
+                
+                # Armazenar para uso futuro
+                pump['npsh_margin'] = margem_npsh
+                pump['npsh_disponivel_ponto'] = npsh_disponivel_ponto
+            
+            # Formatar e exibir o resultado
+            margem_str = f"{margem_npsh:.2f}".replace('.', ',')
+            self.result_npsh_comparison.setText(margem_str + " m")
+            
+            # Alerta visual se a margem for pequena
+            if margem_npsh < 0.5:
+                self.result_npsh_comparison.setStyleSheet("color: red; font-weight: bold;")
+            elif margem_npsh < 1.0:
+                self.result_npsh_comparison.setStyleSheet("color: orange; font-weight: bold;")
+            else:
+                self.result_npsh_comparison.setStyleSheet("")
+            
+            logging.info(f"Margem de NPSH atualizada: {margem_npsh:.2f} m (NPSH disponível: {npsh_disponivel_ponto:.2f} m, NPSHr: {npsh_requerido:.2f} m)")
                 
         except Exception as e:
             logging.error(f"Erro ao atualizar margem NPSH: {e}", exc_info=True)
+            self.result_npsh_comparison.setText("Erro")
+
     
     def atualizar_grafico_bomba_selecionada(self, pump):
         """Atualiza o gráfico com os dados da bomba selecionada."""
@@ -825,15 +973,36 @@ class PumpSelectionWidget(QWidget):
             
             # Obter parâmetros
             n_bombas = int(self.combo_n_bombas.currentText())
-            npsh_disponivel = self.system_input_widget.get_npsh_disponivel()
+            vazao_bomba = pump.get('vazao_bomba', 0.0)
             
-            # Gerar valores de vazão para o gráfico
+            # Gerar valores de vazão para o gráfico (baseado na vazão por bomba)
             pump_vazao_min = pump.get('pump_vazao_min', 0)
             pump_vazao_max = pump.get('pump_vazao_max', 100)
-            flow_values = np.linspace(0, max(pump_vazao_max, self.target_flow * 1.4), 500)
+            
+            # Usar o maior entre a vazão máxima da bomba e a vazão de projeto por bomba com margem
+            vazao_projeto_por_bomba = self.target_flow / n_bombas
+            max_vazao_por_bomba = max(pump_vazao_max, vazao_projeto_por_bomba * 1.4)
+            
+            # Criar array de vazão por bomba para o gráfico
+            flow_values = np.linspace(0, max_vazao_por_bomba, 500)
+            
+            logging.info(f"Calculando NPSH disponível para vazões de 0 a {max_vazao_por_bomba:.2f} m³/h por bomba")
+            
+            # Recalcular a curva de NPSH disponível para este range específico
+            # Importante: usar a vazão por bomba, não a vazão total
+            npsh_disponivel_curva = self.system_input_widget.get_npsh_disponivel(flow_values)
+            
+            # Verificar e logar os valores de NPSH 
+            idx = np.abs(flow_values - vazao_bomba).argmin()
+            npsh_value_at_point = npsh_disponivel_curva[idx] if idx < len(npsh_disponivel_curva) else 0
+            logging.info(f"NPSH disponível no ponto de vazão={vazao_bomba:.2f}: {npsh_value_at_point:.2f}")
+            
+            # Verificar os pontos na curva de NPSH
+            if len(npsh_disponivel_curva) > 0:
+                logging.info(f"Range da curva de NPSH: [{min(npsh_disponivel_curva):.2f}, {max(npsh_disponivel_curva):.2f}]")
             
             # Usar o ponto de interseção já calculado
-            intersection_point = pump.get('ponto_intersecao', [pump.get('vazao_bomba', 0), pump.get('head_value', 0)])
+            intersection_point = pump.get('ponto_intersecao', [vazao_bomba, pump.get('head_value', 0)])
             
             logging.info(f"Ponto de interseção para gráfico: {intersection_point}")
             
@@ -844,15 +1013,14 @@ class PumpSelectionWidget(QWidget):
                             f"eff={pump.get('pump_coef_eff') is not None}")
             
             # Atualizar todos os gráficos utilizando o componente dedicado
-            # is_new_system=False porque queremos manter a escala do gráfico de Head
             self.graph_component.update_plots(
                 system_curve=self.system_curve,
                 pump_data=pump,
                 flow_values=flow_values,
                 n_bombas=n_bombas,
                 intersection_point=intersection_point,
-                npsh_disponivel=npsh_disponivel,
-                is_new_system=False  # Indicar que não é um novo sistema
+                npsh_disponivel=npsh_disponivel_curva,
+                is_new_system=False
             )
             
             logging.info("Gráficos atualizados com sucesso")
