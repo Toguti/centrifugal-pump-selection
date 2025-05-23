@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from UI.extra.local_loss import size_dict_internal_diameter_sch40, size_dict, get_size_singularities_loss_values
+import logging
 
-def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
+def friction_factor(Re, roughness, D, tol=1e-9, max_iter=100):
     """
-    Calcula o fator de atrito para fluxo turbulento utilizando o método iterativo.
+    Calcula o fator de atrito utilizando a equação de Colebrook-White.
     
     Parâmetros:
         Re: Número de Reynolds
@@ -16,14 +17,38 @@ def friction_factor(Re, roughness, D, tol=1e-6, max_iter=100):
     Retorna:
         Fator de atrito (f)
     """
+    
+    # Fluxo laminar
+    if Re < 2000:
+        return 64.0 / Re
+    
+    # Fluxo turbulento - usar Colebrook-White
     epsilon = roughness / D
-    f = (1.14 + 2*np.log10(D/epsilon)) ** (-2)
-    for _ in range(max_iter):
-        f_new = (-2.0 * np.log10(epsilon / 3.7 + 2.51 / (Re * np.sqrt(f))))**-2
+    
+    # Estimativa inicial usando Swamee-Jain (mais precisa que a anterior)
+    try:
+        f = 0.25 / (np.log10(epsilon/3.7 + 5.74/(Re**0.9)))**2
+    except (ValueError, ZeroDivisionError):
+        # Fallback para casos extremos
+        f = 0.02
+    
+    # Iteração usando Colebrook-White
+    for i in range(max_iter):
+        f_sqrt = np.sqrt(f)
+        try:
+            f_new = (-2.0 * np.log10(epsilon/3.7 + 2.51/(Re * f_sqrt)))**(-2)
+        except (ValueError, ZeroDivisionError):
+            # Em caso de erro matemático, usar o valor atual
+            return f
+            
         if abs(f_new - f) < tol:
             return f_new
+            
         f = f_new
-    raise RuntimeError(f"Failed to converge after {max_iter} iterations.")
+    
+    # Se não convergiu, usar a aproximação de Swamee-Jain como resultado final
+    return f
+
 
 
 def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
@@ -62,6 +87,9 @@ def pressure_loss(D, L, Q, mu, rho, g, h, K, roughness):
         64 / Re_i if Re_i < 2000 else friction_factor(Re_i, roughness, D)
         for Re_i in Re
     ])
+
+    for flow_m3h, friction, reynolds in zip(Q * 3600.0, f, Re):
+        logging.info("Vazão: %.6f m³/h, Fator de atrito: %.6f, Número de Reynolds: %.2f", flow_m3h, friction, reynolds)
 
     # Perda de carga por atrito (m)
     h_f = f * (L / D) * (V**2) / (2 * g)

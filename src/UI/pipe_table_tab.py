@@ -122,18 +122,18 @@ class SystemInputWidget(QWidget):
         
         # Valores iniciais para testes
         input_values_suction = {
-            "Trecho Retilineo": 5,  # metros
-            "Diferença de Altura": -3,  # metros
+            "Trecho Retilineo": 13.68,  # metros
+            "Diferença de Altura": (-3),  # metros
             "Cotovelo 90° Raio Longo": 0,  # quantidade
             "Cotovelo 90° Raio Médio": 0, 
-            "Cotovelo 90° Raio Curto": 1,
+            "Cotovelo 90° Raio Curto": 0,
             "Cotovelo 45°": 0, 
             "Curva 90° Raio Longo": 0, 
             "Curva 90° Raio Curto": 0, 
             "Curva 45°": 0, 
             "Entrada Normal": 0, 
-            "Entrada de Borda": 1, 
-            "Válvula Gaveta Aberta": 1, 
+            "Entrada de Borda": 0, 
+            "Válvula Gaveta Aberta": 0, 
             "Válvula Globo Aberta": 0, 
             "Válvula Ângular Aberta": 0, 
             "Passagem Reta Tê": 0,
@@ -146,27 +146,27 @@ class SystemInputWidget(QWidget):
         }
 
         input_values_discharge = {
-            "Trecho Retilineo": 87.1,  # metros
+            "Trecho Retilineo": 184.86,  # metros
             "Diferença de Altura": 22.1,  # metros estimados
             "Cotovelo 90° Raio Longo": 0, 
             "Cotovelo 90° Raio Médio": 0, 
-            "Cotovelo 90° Raio Curto": 9,
+            "Cotovelo 90° Raio Curto": 0,
             "Cotovelo 45°": 0, 
             "Curva 90° Raio Longo": 0, 
             "Curva 90° Raio Curto": 0, 
             "Curva 45°": 0, 
             "Entrada Normal": 0, 
             "Entrada de Borda": 0, 
-            "Válvula Gaveta Aberta": 2, 
+            "Válvula Gaveta Aberta": 0, 
             "Válvula Globo Aberta": 0,  # registro de globo aberto
             "Válvula Ângular Aberta": 0, 
-            "Passagem Reta Tê": 3,
+            "Passagem Reta Tê": 0,
             "Derivação Tê": 0, 
             "Bifurcação Tê": 0, 
             "Válvula de Pé e Crivo": 0, 
             "Saída de Canalização": 0,  # quantidade
             "Válvula de Retenção Leve": 0, 
-            "Válvula de Retenção Pesado": 2  # válvula de retenção
+            "Válvula de Retenção Pesado": 0  # válvula de retenção
         }
         
         # Seleciona os valores apropriados baseado no tipo de entrada
@@ -269,12 +269,14 @@ class SystemInputWidget(QWidget):
                 input_spin_box.setDecimals(2)
                 input_spin_box.setSingleStep(0.05)
                 input_spin_box.setMaximum(999999)
+                input_spin_box.setValue(input_values[label])
             
             # Configurações para Diferença de Altura (permitir valores negativos)
             if label == "Diferença de Altura":
                 input_spin_box.setMinimum(-999)  # Permitir valores negativos até -100m
                 input_spin_box.setMaximum(999)   # Permitir valores positivos até 100m
                 input_spin_box.setDecimals(2)    # Permitir 2 casas decimais
+                input_spin_box.setValue(input_values[label])
                 
                 # Tooltips diferentes para sucção e recalque
                 if is_suction:

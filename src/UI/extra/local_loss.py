@@ -1,31 +1,15 @@
 import pandas as pd
 import numpy as np
 
+# Load the CSV table. Make sure the index corresponds to the size values.
 dt_equiv_lenght = pd.read_csv("./src/db/eq_lenght_exported.csv", sep=";", decimal=',', index_col=0)
 
 def get_size_singularities_loss_values(size):
+    if size not in dt_equiv_lenght.index:
+        raise ValueError(f"Size {size} not found in the CSV data.")
     current_size_row = dt_equiv_lenght.loc[size]
+    # Adjust slicing below if needed in case the CSV columns order changes.
     return current_size_row[1:].to_numpy()
-
-# options = ['ct_90_rl', 
-#            'ct_90_rm', 
-#            'ct_90_rc', 
-#            'ct_45', 
-#            'cur_90_1_1-2', 
-#            'cur_90_1', 
-#            'cur_45', 
-#            'ent_norm', 
-#            'ent_borda', 
-#            'rg_ga_a', 
-#            'rg_gb_a', 
-#            'rg_an_a', 
-#            'te_main', 
-#            'te_deriv', 
-#            'te_div', 
-#            'val_pec', 
-#            'sai_can', 
-#            'valv_ret_leve', 
-#            'valv_ret_pesado']
 
 size_dict = {
     "13 (1/2\")": 13,
@@ -43,7 +27,10 @@ size_dict = {
     "250 (10\")": 250,
     "300 (12\")": 300,
     "350 (14\")": 350,
+    "400 (16\")": 400,
+    "500 (20\")": 500,
 }
+
 size_dict_internal_diameter_sch40 = {
     "13 (1/2\")": 15.80,
     "19 (3/4\")": 20.93,
@@ -60,4 +47,6 @@ size_dict_internal_diameter_sch40 = {
     "250 (10\")": 254.51,
     "300 (12\")": 303.23,
     "350 (14\")": 333.34,
+    "400 (16\")": 406.40,
+    "500 (20\")": 508.00,
 }

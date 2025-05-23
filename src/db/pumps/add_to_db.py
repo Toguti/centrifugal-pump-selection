@@ -8,7 +8,6 @@ import json
 def create_database(db_path: str) -> None:
     """
     Cria o banco de dados e a tabela pump_models, se não existir.
-    A tabela inclui as novas colunas: eff_bop, eff_bop_flow, p80_eff_bop_flow, p110_eff_bop_flow e estagios.
     """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -39,9 +38,6 @@ def create_database(db_path: str) -> None:
 def create_connection(db_path: str) -> sqlite3.Connection:
     """
     Cria e retorna uma conexão com o banco de dados SQLite.
-    Otimizações:
-      - Configura o journal_mode para WAL e synchronous para NORMAL,
-        melhorando a performance em inserções em massa.
     """
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode = WAL;")
